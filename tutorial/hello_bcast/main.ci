@@ -1,0 +1,11 @@
+mainmodule main {
+	readonly CProxy_Main mainProxy;
+	
+	extern module hello;
+
+	mainchare Main {
+		entry Main(CkArgMsg *msg);
+		entry void done();
+	};
+};
+

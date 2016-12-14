@@ -1,0 +1,10 @@
+module hello {
+	// The "class" in C++ is actually defining an object
+	// which is an array of Chares, not a single one
+	// that's where thisProxy and thisIndex come from.
+	array[1D] Hello {
+		entry Hello();
+		entry void sayHi(int);
+	};
+};
+
