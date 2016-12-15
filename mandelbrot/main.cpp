@@ -30,7 +30,8 @@ Main::Main(CkArgMsg *msg) : done_count(0), run_iters(1), iters(0) {
 				CkPrintf("Arguments:\n"
 						"\t--tile W H       set tile width and height. Default 16 16\n"
 						"\t--img W H        set image dimensions in tiles. Default 100 100\n"
-						"\t--samples N      set number of subsamples taken for each pixel. Default 1\n");
+						"\t--samples N      set number of subsamples taken for each pixel along x/y\n"
+            "\t                     so the total # of samples will be N^2. Default 1\n");
 				CkExit();
 			} else if (std::strcmp("--tile", msg->argv[i]) == 0) {
 				TILE_W = std::atoi(msg->argv[++i]);
@@ -52,7 +53,7 @@ Main::Main(CkArgMsg *msg) : done_count(0), run_iters(1), iters(0) {
 
 	CkPrintf("Rendering %dx%d Mandelbrot set with %dx%d tile size and %d samples/pixel\n"
 			"\tRunning %d iterations for load balancing testing\n",
-			IMAGE_W, IMAGE_H, TILE_W, TILE_H, subsamples, run_iters);
+			IMAGE_W, IMAGE_H, TILE_W, TILE_H, subsamples * subsamples, run_iters);
 
 	mandel_tiles = CProxy_MandelTile::ckNew(subsamples, num_tiles);
 	start = std::chrono::high_resolution_clock::now();
