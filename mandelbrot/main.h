@@ -8,6 +8,7 @@
 
 class Main : public CBase_Main {
 	uint64_t done_count;
+	uint64_t run_iters;
 	uint64_t iters;
 	uint64_t num_tiles;
 	std::vector<uint8_t> image;

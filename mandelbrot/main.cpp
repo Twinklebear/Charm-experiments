@@ -14,7 +14,7 @@ uint64_t IMAGE_H;
 uint64_t TILE_W;
 uint64_t TILE_H;
 
-Main::Main(CkArgMsg *msg) : done_count(0), iters(0) {
+Main::Main(CkArgMsg *msg) : done_count(0), run_iters(1), iters(0) {
 	// Set some default image dimensions
 	TILE_W = 16;
 	TILE_H = 16;
@@ -40,6 +40,8 @@ Main::Main(CkArgMsg *msg) : done_count(0), iters(0) {
 				tiles_y = std::atoi(msg->argv[++i]);
 			} else if (std::strcmp("--samples", msg->argv[i]) == 0) {
 				subsamples = std::atoi(msg->argv[++i]);
+			} else if (std::strcmp("--iters", msg->argv[i]) == 0) {
+				run_iters = std::atoi(msg->argv[++i]);
 			}
 		}
 	}
@@ -48,8 +50,9 @@ Main::Main(CkArgMsg *msg) : done_count(0), iters(0) {
 	num_tiles = tiles_x * tiles_y;
 	image.resize(IMAGE_W * IMAGE_H, 0);
 
-	CkPrintf("Rendering %dx%d Mandelbrot set with %dx%d tile size and %d samples/pixel\n",
-			IMAGE_W, IMAGE_H, TILE_W, TILE_H, subsamples);
+	CkPrintf("Rendering %dx%d Mandelbrot set with %dx%d tile size and %d samples/pixel\n"
+			"\tRunning %d iterations for load balancing testing\n",
+			IMAGE_W, IMAGE_H, TILE_W, TILE_H, subsamples, run_iters);
 
 	mandel_tiles = CProxy_MandelTile::ckNew(subsamples, num_tiles);
 	start = std::chrono::high_resolution_clock::now();
@@ -79,7 +82,7 @@ void Main::tile_done(const uint64_t x, const uint64_t y, const uint8_t *tile) {
 		auto end = std::chrono::high_resolution_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		CkPrintf("Rendering took %dms\n", duration.count());
-		if (iters == 6) {
+		if (iters == run_iters) {
 			// It seems that CkExit doesn't finish destructors? The ofstream sometimes
 			// won't flush and write to disk if I don't have its dtor called before CkExit
 			{
