@@ -7,7 +7,8 @@ for a tile in the image, so the rendering can be distributed image-parallel acro
 
 - `--tile W H` specify the width and height of each tile.
 - `--img W H` specify the width and height of the image in tiles.
-- `--samples N` specify the number of subsamples to take for each pixel
+- `--samples N` specify the number of subsamples to take for each pixel along each axis. The
+	actual number of samples taken will be the square of this value.
 
 ## Multithreading Notes
 
