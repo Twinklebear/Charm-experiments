@@ -1,4 +1,4 @@
-CHARMDIR=~/libs/charm/mpi-linux-x86_64-smp-mpicxx
+CHARMDIR?=~/libs/charm/mpi-linux-x86_64-smp-mpicxx
 CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
 
 all: hello.out
