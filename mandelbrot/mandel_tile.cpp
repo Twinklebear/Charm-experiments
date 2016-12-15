@@ -21,7 +21,7 @@ MandelTile::MandelTile(uint64_t subsamples) : max_iters(255), subsamples(subsamp
 	y_axis[1] = 1.25f;
 }
 MandelTile::MandelTile(CkMigrateMessage *msg) {
-	//CkPrintf("MandelTile #%d was migrated\n", thisIndex);
+	CkPrintf("MandelTile #[%d, %d] was migrated\n", thisIndex.x, thisIndex.y);
 }
 
 void MandelTile::pup(PUP::er &p) {
@@ -34,13 +34,13 @@ void MandelTile::pup(PUP::er &p) {
 }
 void MandelTile::render() {
 	const uint64_t tiles_x = IMAGE_W / TILE_W;
-	const uint64_t start_x = (thisIndex % tiles_x) * TILE_W;
-	const uint64_t start_y = (thisIndex / tiles_x) * TILE_H;
+	const uint64_t start_x = thisIndex.x * TILE_W;
+	const uint64_t start_y = thisIndex.y * TILE_H;
 #if 0
 	char hostname[128] = {0};
 	gethostname(hostname, 127);
-	CkPrintf("MandelTile #%d on processor %d starts at [%d, %d], host = %s\n",
-			thisIndex, CkMyPe(), start_x, start_y, hostname);
+	CkPrintf("MandelTile #[%d, %d] on processor %d starts at [%d, %d], host = %s\n",
+			thisIndex.x, thisIndex.y, CkMyPe(), start_x, start_y, hostname);
 #endif
 
 	uint8_t *tile = new uint8_t[TILE_W * TILE_H];

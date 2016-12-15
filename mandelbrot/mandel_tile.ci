@@ -1,5 +1,5 @@
 module mandel_tile {
-	array[1D] MandelTile {
+	array[2D] MandelTile {
 		entry MandelTile(uint64_t);
 		entry void render();
 	};

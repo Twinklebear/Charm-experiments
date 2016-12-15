@@ -55,7 +55,7 @@ Main::Main(CkArgMsg *msg) : done_count(0), run_iters(1), iters(0) {
 			"\tRunning %d iterations for load balancing testing\n",
 			IMAGE_W, IMAGE_H, TILE_W, TILE_H, subsamples * subsamples, run_iters);
 
-	mandel_tiles = CProxy_MandelTile::ckNew(subsamples, num_tiles);
+	mandel_tiles = CProxy_MandelTile::ckNew(subsamples, tiles_x, tiles_y);
 	start = std::chrono::high_resolution_clock::now();
 	mandel_tiles.render();
 }
