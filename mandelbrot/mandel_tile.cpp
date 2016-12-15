@@ -1,4 +1,5 @@
 #include <fstream>
+#include <unistd.h>
 #include "mandel_tile.decl.h"
 #include "main.decl.h"
 #include "mandel_tile.h"
@@ -12,19 +13,35 @@ extern uint64_t IMAGE_H;
 extern uint64_t TILE_W;
 extern uint64_t TILE_H;
 
-MandelTile::MandelTile(uint64_t subsamples)
-	: x_axis({-1.75, 0.75}), y_axis({-1.25, 1.25}), max_iters(255), subsamples(subsamples)
-{}
-MandelTile::MandelTile(CkMigrateMessage *msg) {}
+MandelTile::MandelTile(uint64_t subsamples) : max_iters(255), subsamples(subsamples) {
+	// Compiler on cluster is old POS so gotta fallback to old-style
+	x_axis[0] = -1.75f;
+	x_axis[1] = 0.75f;
+	y_axis[0] = -1.25f;
+	y_axis[1] = 1.25f;
+}
+MandelTile::MandelTile(CkMigrateMessage *msg) {
+	//CkPrintf("MandelTile #%d was migrated\n", thisIndex);
+}
 
+void MandelTile::pup(PUP::er &p) {
+	p | x_axis[0];
+	p | x_axis[1];
+	p | y_axis[0];
+	p | y_axis[1];
+	p | max_iters;
+	p | subsamples;
+}
 void MandelTile::render() {
 	const uint64_t tiles_x = IMAGE_W / TILE_W;
 	const uint64_t start_x = (thisIndex % tiles_x) * TILE_W;
 	const uint64_t start_y = (thisIndex / tiles_x) * TILE_H;
-	/*
-	CkPrintf("MandelTile #%d on processor %d starts at [%d, %d]\n",
-			thisIndex, CkMyPe(), start_x, start_y);
-			*/
+#if 0
+	char hostname[128] = {0};
+	gethostname(hostname, 127);
+	CkPrintf("MandelTile #%d on processor %d starts at [%d, %d], host = %s\n",
+			thisIndex, CkMyPe(), start_x, start_y, hostname);
+#endif
 
 	uint8_t *tile = new uint8_t[TILE_W * TILE_H];
 	const float dx = (x_axis[1] - x_axis[0]) / IMAGE_W;

@@ -14,7 +14,7 @@ uint64_t IMAGE_H;
 uint64_t TILE_W;
 uint64_t TILE_H;
 
-Main::Main(CkArgMsg *msg) {
+Main::Main(CkArgMsg *msg) : done_count(0), iters(0) {
 	// Set some default image dimensions
 	TILE_W = 16;
 	TILE_H = 16;
@@ -22,7 +22,6 @@ Main::Main(CkArgMsg *msg) {
 	uint64_t tiles_x = 100;
 	uint64_t tiles_y = 100;
 	main_proxy = thisProxy;
-	done_count = 0;
 	uint64_t subsamples = 1;
 
 	if (msg->argc > 1) {
@@ -52,7 +51,7 @@ Main::Main(CkArgMsg *msg) {
 	CkPrintf("Rendering %dx%d Mandelbrot set with %dx%d tile size and %d samples/pixel\n",
 			IMAGE_W, IMAGE_H, TILE_W, TILE_H, subsamples);
 
-	CProxy_MandelTile mandel_tiles = CProxy_MandelTile::ckNew(subsamples, num_tiles);
+	mandel_tiles = CProxy_MandelTile::ckNew(subsamples, num_tiles);
 	start = std::chrono::high_resolution_clock::now();
 	mandel_tiles.render();
 }
@@ -75,18 +74,26 @@ void Main::tile_done(const uint64_t x, const uint64_t y, const uint8_t *tile) {
 	// Check if we've finished rendering all the tiles and can
 	// save out the final image and exit
 	if (done_count == num_tiles) {
+		++iters;
+		done_count = 0;
 		auto end = std::chrono::high_resolution_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		CkPrintf("Rendering took %dms\n", duration.count());
-		// It seems that CkExit doesn't finish destructors? The ofstream sometimes
-		// won't flush and write to disk if I don't have its dtor called before CkExit
-		{
-			std::ofstream fout("charm_mandel.pgm");
-			fout << "P5\n" << IMAGE_W << " " << IMAGE_H << "\n255\n";
-			fout.write(reinterpret_cast<const char*>(image.data()), IMAGE_W * IMAGE_H);
-			fout << "\n";
+		if (iters == 6) {
+			// It seems that CkExit doesn't finish destructors? The ofstream sometimes
+			// won't flush and write to disk if I don't have its dtor called before CkExit
+			{
+				std::ofstream fout("charm_mandel.pgm");
+				fout << "P5\n" << IMAGE_W << " " << IMAGE_H << "\n255\n";
+				fout.write(reinterpret_cast<const char*>(image.data()), IMAGE_W * IMAGE_H);
+				fout << "\n";
+			}
+			CkExit();
+		} else {
+			CkPrintf("Starting next iteration of rendering\n");
+			start = std::chrono::high_resolution_clock::now();
+			mandel_tiles.render();
 		}
-		CkExit();
 	}
 }
 
