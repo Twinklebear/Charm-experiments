@@ -16,7 +16,7 @@ To run with 1 threaded process per node you can also pass the `+ppn M` argument,
 cores. So for example on an 8 core machine running this mandelbrot example:
 
 ```
-./charmrun ./mandelbrot.out +p 8 +ppn 8
+./charmrun ./mandelbrot.out +p 8 ++ppn 8
 ```
 
 Now Charm++ will run 8 processes in total with 8 lightweight thread "processes" per node, so the result
