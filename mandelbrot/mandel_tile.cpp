@@ -21,7 +21,7 @@ MandelTile::MandelTile(uint64_t subsamples) : max_iters(255), subsamples(subsamp
 	y_axis[1] = 1.25f;
 }
 MandelTile::MandelTile(CkMigrateMessage *msg) {
-	CkPrintf("MandelTile #[%d, %d] was migrated\n", thisIndex.x, thisIndex.y);
+	//CkPrintf("MandelTile #[%d, %d] was migrated\n", thisIndex.x, thisIndex.y);
 }
 
 void MandelTile::pup(PUP::er &p) {
