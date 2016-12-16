@@ -8,7 +8,7 @@
 struct vec3f {
 	float x, y, z;
 
-	inline vec3f(float s) : x(s), y(s), z(s) {}
+	inline vec3f(float s = 0) : x(s), y(s), z(s) {}
 	inline vec3f(float x, float y, float z) : x(x), y(y), z(z) {}
 };
 
@@ -67,12 +67,14 @@ struct Sphere {
 	vec3f center;
 	float radius;
 
+	Sphere(const vec3f &center, float radius);
 	void intersect(Isect &isect, const Ray &ray) const;
 };
 
 struct Plane {
 	vec3f p, n;
 
+	Plane(const vec3f &p, const vec3f &n);
 	void intersect(Isect &isect, const Ray &ray) const;
 };
 

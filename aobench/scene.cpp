@@ -17,6 +17,7 @@ void ortho_basis(std::array<vec3f, 3> &basis, const vec3f &n) {
 	basis[1] = normalized(cross(basis[2], basis[0]));
 }
 
+Sphere::Sphere(const vec3f &center, float radius) : center(center), radius(radius) {}
 void Sphere::intersect(Isect &isect, const Ray &ray) const {
 	vec3f rs = ray.origin - center;
 
@@ -36,6 +37,7 @@ void Sphere::intersect(Isect &isect, const Ray &ray) const {
 	}
 }
 
+Plane::Plane(const vec3f &p, const vec3f &n) : p(p), n(n) {}
 void Plane::intersect(Isect &isect, const Ray &ray) const {
 	const float d = -dot(p, n);
 	const float v = dot(ray.dir, n);

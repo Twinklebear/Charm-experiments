@@ -13,8 +13,16 @@ extern uint64_t IMAGE_H;
 extern uint64_t TILE_W;
 extern uint64_t TILE_H;
 
-AOBenchTile::AOBenchTile(uint64_t ao_samples) : ao_samples(ao_samples) {}
-AOBenchTile::AOBenchTile(CkMigrateMessage *msg) {
+AOBenchTile::AOBenchTile(uint64_t ao_samples) : ao_samples(ao_samples),
+	spheres({Sphere{vec3f{-2.f, 0.f, -2.5f}, 0.5f}, Sphere{vec3f{-0.5f, 0.f, -3.f}, 0.5f},
+			Sphere{vec3f{1.f, 0.f, -2.2f}, 0.5f}}),
+	plane(vec3f{0.f, -0.5f, 0.f}, vec3f{0, 1, 0})
+{}
+AOBenchTile::AOBenchTile(CkMigrateMessage *msg)
+	: spheres({Sphere{vec3f{-2.f, 0.f, -2.5f}, 0.5f}, Sphere{vec3f{-0.5f, 0.f, -3.f}, 0.5f},
+			Sphere{vec3f{1.f, 0.f, -2.2f}, 0.5f}}),
+	plane(vec3f{0.f, -0.5f, 0.f}, vec3f{0, 1, 0})
+{
 	//CkPrintf("AOBenchTile #[%d, %d] was migrated\n", thisIndex.x, thisIndex.y);
 }
 
