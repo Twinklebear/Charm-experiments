@@ -12,7 +12,7 @@ class Main : public CBase_Main {
 	uint64_t spp;
 	uint64_t num_tiles;
 	std::vector<float> image;
-	std::chrono::high_resolution_clock::time_point start;
+	std::chrono::high_resolution_clock::time_point start_pass, start_render;
 	CProxy_AOBenchTile aobench_tiles;
 
 public:

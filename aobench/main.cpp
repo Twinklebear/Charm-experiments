@@ -56,7 +56,7 @@ Main::Main(CkArgMsg *msg) : done_count(0), samples_taken(0), spp(1) {
 			IMAGE_W, IMAGE_H, TILE_W, TILE_H, spp, ao_samples);
 
 	aobench_tiles = CProxy_AOBenchTile::ckNew(ao_samples, tiles_x, tiles_y);
-	start = std::chrono::high_resolution_clock::now();
+	start_pass = start_render = std::chrono::high_resolution_clock::now();
 	aobench_tiles.render_sample();
 }
 Main::Main(CkMigrateMessage *msg) {
@@ -80,9 +80,11 @@ void Main::tile_done(const uint64_t x, const uint64_t y, const float *tile) {
 		++samples_taken;
 		done_count = 0;
 		auto end = std::chrono::high_resolution_clock::now();
-		auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+		auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start_pass);
 		CkPrintf("Iteration took %dms\n", duration.count());
 		if (samples_taken == spp) {
+			duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start_render);
+			CkPrintf("Rendering took %dms\n", duration.count());
 			std::vector<char> image_out(IMAGE_W * IMAGE_H, 0);
 			for (uint64_t i = 0; i < IMAGE_H; ++i) {
 				for (uint64_t j = 0; j < IMAGE_W; ++j) {
@@ -100,7 +102,7 @@ void Main::tile_done(const uint64_t x, const uint64_t y, const float *tile) {
 			CkExit();
 		} else {
 			CkPrintf("Starting next iteration of rendering\n");
-			start = std::chrono::high_resolution_clock::now();
+			start_pass = std::chrono::high_resolution_clock::now();
 			aobench_tiles.render_sample();
 		}
 	}
