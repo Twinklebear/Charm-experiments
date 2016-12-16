@@ -14,7 +14,6 @@ extern uint64_t TILE_W;
 extern uint64_t TILE_H;
 
 MandelTile::MandelTile(uint64_t subsamples) : max_iters(255), subsamples(subsamples) {
-	// Compiler on cluster is old POS so gotta fallback to old-style
 	x_axis[0] = -1.75f;
 	x_axis[1] = 0.75f;
 	y_axis[0] = -1.25f;
