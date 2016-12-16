@@ -70,7 +70,7 @@ void Main::tile_done(const uint64_t x, const uint64_t y, const float *tile) {
 	// Write this tiles data into the image
 	for (uint64_t i = 0; i < TILE_H; ++i) {
 		for (uint64_t j = 0; j < TILE_W; ++j) {
-			image[(i + y) * IMAGE_W + j + x] += tile[i * TILE_H + j];
+			image[(i + y) * IMAGE_W + j + x] += tile[i * TILE_W + j];
 		}
 	}
 	++done_count;
