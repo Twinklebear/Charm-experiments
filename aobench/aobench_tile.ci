@@ -1,0 +1,7 @@
+module aobench_tile {
+	array[2D] AOBenchTile {
+		entry AOBenchTile(uint64_t);
+		entry void render_sample();
+	};
+};
+

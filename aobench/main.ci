@@ -1,0 +1,18 @@
+mainmodule main {
+	readonly CProxy_Main main_proxy;
+	// Image dimensions
+	readonly uint64_t IMAGE_W;
+	readonly uint64_t IMAGE_H;
+	// Tile x/y dimensions
+	readonly uint64_t TILE_W;
+	readonly uint64_t TILE_H;
+
+	extern module aobench_tile;
+
+	mainchare Main {
+		entry Main(CkArgMsg *msg);
+		// Called by each AOBenchTile when they've finished computing the tile
+		entry void tile_done(const uint64_t x, const uint64_t y, const float tile[TILE_W * TILE_H]);
+	};
+};
+
