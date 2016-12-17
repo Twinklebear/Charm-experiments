@@ -12,7 +12,7 @@ for a tile in the image, so the rendering can be distributed image-parallel acro
 
 ## Multithreading Notes
 
-To run with 1 threaded process per node you can also pass the `+ppn M` argument, specifying each node has M
+To run with 1 threaded process per node you can also pass the `++ppn M` argument, specifying each node has M
 cores. So for example on an 8 core machine running this mandelbrot example:
 
 ```
