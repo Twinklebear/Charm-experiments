@@ -9,7 +9,7 @@ hello.out: main.o hello.o
 hello.o: hello.cpp hello.h hello.decl.h hello.def.h main.decl.h
 	$(CHARMC) $< -o $@
 
-%.o: %.cpp %.h %.decl.h %.def.h
+%.o: %.cpp %.h %.decl.h %.def.h hello.decl.h
 	$(CHARMC) $< -o $@
 
 %.decl.h %.def.h: %.ci
