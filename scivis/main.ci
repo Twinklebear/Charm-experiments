@@ -1,0 +1,15 @@
+mainmodule main {
+	readonly CProxy_Main main_proxy;
+	// Image dimensions
+	readonly uint64_t IMAGE_W;
+	readonly uint64_t IMAGE_H;
+	// Tile x/y dimensions
+	readonly uint64_t TILE_W;
+	readonly uint64_t TILE_H;
+
+	mainchare Main {
+		entry Main(CkArgMsg *msg);
+	};
+};
+
+
