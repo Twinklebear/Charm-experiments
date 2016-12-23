@@ -1,15 +1,22 @@
 CHARMDIR?=~/libs/charm/multicore-linux64
 CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
+CHARM_SRCS=main.cpp
+CHARM_OBJS=$(CHARM_SRCS:.cpp=.o)
+CHARM_DECLS=$(CHARM_SRCS:.cpp=.decl.h)
 
 all: scivis.out
 
-scivis.out: main.o
-	$(CHARMC) -optimize -module CommonLBs -balance workstealing -language charm++ -c++-option -std=c++11 $^ -o $@
+scivis.out: $(CHARM_OBJS) sv/libscivis.a
+	$(CHARMC) -optimize -module CommonLBs -balance workstealing -language charm++ \
+		-c++-option -std=c++11 $^ -o $@ -Lsv/ -lscivis
+
+sv/libscivis.a:
+	$(MAKE) -C sv all
 
 # The Charm++ generated code seems to produce a lot of warnings at this high a warning level,
 # makes it kind of hard to find warnings about my code.
 #$(CHARMC) -c++-option -std=c++11 -c++-option -Wall -c++-option -Wextra -c++-option -pedantic $< -o $@
-%.o: %.cpp %.h %.decl.h %.def.h
+%.o: %.cpp %.h %.def.h $(CHARM_DECLS)
 	$(CHARMC) -balance workstealing -optimize -c++-option -std=c++11 $< -o $@
 
 %.decl.h %.def.h: %.ci
@@ -20,5 +27,6 @@ scivis.out: main.o
 
 .PHONY: clean
 clean:
-	rm -f *.decl.h *.def.h *.o hello charmrun
+	$(MAKE) -C sv clean
+	rm -f *.decl.h *.def.h *.o *.a scivis.out charmrun
 
