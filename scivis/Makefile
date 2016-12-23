@@ -10,7 +10,7 @@ scivis.out: $(CHARM_OBJS) sv/libscivis.a
 	$(CHARMC) -optimize -module CommonLBs -balance workstealing -language charm++ \
 		-c++-option -std=c++11 $^ -o $@ -Lsv/ -lscivis
 
-sv/libscivis.a:
+sv/libscivis.a: $(wildcard sv/*.cpp sv/*.h)
 	$(MAKE) -C sv all
 
 # The Charm++ generated code seems to produce a lot of warnings at this high a warning level,
