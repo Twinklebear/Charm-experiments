@@ -5,12 +5,14 @@
 #include <memory>
 #include <vector>
 #include <glm/glm.hpp>
+#include "bbox.h"
 
 namespace sv {
 
 class Volume {
 protected:
 	glm::uvec3 offset, dims;
+	BBox bounds;
 
 public:
 	Volume(const glm::uvec3 &offset, const glm::uvec3 &dims);
@@ -23,6 +25,7 @@ public:
 	virtual float get_min() const = 0;
 	const glm::uvec3& get_offset() const;
 	const glm::uvec3& get_dims() const;
+	const BBox& get_bounds() const;
 };
 
 enum class VolumeDType {

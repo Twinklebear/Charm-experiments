@@ -5,7 +5,9 @@
 
 namespace sv {
 
-Volume::Volume(const glm::uvec3 &offset, const glm::uvec3 &dims) : offset(offset), dims(dims) {}
+Volume::Volume(const glm::uvec3 &offset, const glm::uvec3 &dims)
+	: offset(offset), dims(dims), bounds(glm::vec3(offset), glm::vec3(offset + dims))
+{}
 Volume::~Volume() {}
 const glm::uvec3& Volume::get_offset() const {
 	return offset;
