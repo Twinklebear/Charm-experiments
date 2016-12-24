@@ -30,8 +30,8 @@ enum class VolumeDType {
 
 // Load the region or subregion of a raw volume file
 std::shared_ptr<Volume> load_raw_volume(const std::string &fname, const glm::uvec3 &dims,
-		const VolumeDType dtype, const glm::uvec3 &offset = glm::uvec3{0},
-		const glm::uvec3 &subregion_dims = glm::uvec3{0});
+		const VolumeDType dtype, const glm::uvec3 &offset = glm::uvec3(0),
+		const glm::uvec3 &subregion_dims = glm::uvec3(0));
 
 template<typename T>
 class VolumeData : public Volume {
@@ -55,7 +55,7 @@ public:
 		min(std::numeric_limits<T>::max()), max(std::numeric_limits<T>::min())
 	{
 		const T *vt = static_cast<const T*>(v);
-		for (unsigned int i = 0; i < dims.x * dims.y * dims.z; ++i) { 
+		for (unsigned int i = 0; i < dims.x * dims.y * dims.z; ++i) {
 			data[i] = vt[i];
 			min = std::min(min, vt[i]);
 			max = std::max(max, vt[i]);
@@ -74,7 +74,7 @@ public:
 		for (size_t z = 0; z < rsize.z; ++z) {
 			for (size_t y = 0; y < rsize.y; ++y) {
 				for (size_t x = 0; x < rsize.x; ++x) {
-					const glm::uvec3 p = start + glm::uvec3{x, y, z};
+					const glm::uvec3 p = start + glm::uvec3(x, y, z);
 					const T& val = vt[(z * rsize.y + y) * rsize.x + x];
 					data[(p.z * dims.y + p.y) * dims.x + p.x] = val;
 					min = std::min(val, min);
@@ -106,7 +106,7 @@ private:
 	}
 	inline T bilinear_sample(const glm::vec2 &coords, const int z) const {
 		const glm::ivec2 origin = glm::ivec2(coords);
-		const glm::vec2 local = glm::vec2{coords.x - origin.x, coords.y - origin.y};
+		const glm::vec2 local = glm::vec2(coords.x - origin.x, coords.y - origin.y);
 		return get_voxel(origin.x, origin.y, z) * (1.0 - local.x) * (1.0 - local.y)
 			+ get_voxel(origin.x + 1, origin.y, z) * local.x * (1.0 - local.y)
 			+ get_voxel(origin.x, origin.y + 1, z) * (1.0 - local.x) * local.y
