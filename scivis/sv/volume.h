@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <algorithm>
 #include <memory>
 #include <vector>
@@ -27,6 +28,8 @@ public:
 enum class VolumeDType {
 	UINT8, UINT16, INT32, FLOAT, DOUBLE
 };
+VolumeDType parse_volume_dtype(const std::string &s);
+std::istream& operator>>(std::istream &is, VolumeDType &dtype);
 
 // Load the region or subregion of a raw volume file
 std::shared_ptr<Volume> load_raw_volume(const std::string &fname, const glm::uvec3 &dims,

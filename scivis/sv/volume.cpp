@@ -1,4 +1,5 @@
 #include <fstream>
+#include <string>
 #include <iostream>
 #include "volume.h"
 
@@ -13,6 +14,28 @@ const glm::uvec3& Volume::get_dims() const {
 	return dims;
 }
 
+VolumeDType parse_volume_dtype(const std::string &s) {
+	if (s == "uint8") {
+		return VolumeDType::UINT8;
+	} else if (s == "uint16") {
+		return VolumeDType::UINT16;
+	} else if (s == "int32") {
+		return VolumeDType::INT32;
+	} else if (s == "float") {
+		return VolumeDType::FLOAT;
+	} else if (s == "double") {
+		return VolumeDType::DOUBLE;
+	} else {
+		throw std::runtime_error("Invalid VolumeDType: '" + s + "'");
+	}
+}
+std::istream& operator>>(std::istream &is, VolumeDType &dtype) {
+	std::string s;
+	is >> s;
+	std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+	dtype = parse_volume_dtype(s);
+	return is;
+}
 static size_t dtype_size(const VolumeDType &dtype) {
 	switch (dtype) {
 		case VolumeDType::UINT8: return 1;
