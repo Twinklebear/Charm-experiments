@@ -7,6 +7,7 @@
 
 #include "sv/scivis.h"
 #include "main.decl.h"
+#include "image_parallel_tile.decl.h"
 #include "main.h"
 
 // readonly global Charm++ variables
@@ -25,16 +26,15 @@ const static std::string USAGE =
 "\t                                      is the data type, one of:\n"
 "\t                                      uint8, uint16, int32, float or double\n"
 "\t--tile W H                        set tile width and height. Default 16 16\n"
-"\t--img W H                         set image dimensions in tiles. Default 100 100\n"
-"\t--spp N                           set number of samples taken for each pixel along. Default 1";
+"\t--img W H                         set image dimensions in tiles. Default 100 100\n";
 
-Main::Main(CkArgMsg *msg) : spp(1) {
+Main::Main(CkArgMsg *msg) : done_count(0) {
 	// Set some default image dimensions
-	TILE_W = 16;
-	TILE_H = 16;
+	TILE_W = 32;
+	TILE_H = 32;
 	// Number of tiles along each dimension
-	uint64_t tiles_x = 100;
-	uint64_t tiles_y = 100;
+	uint64_t tiles_x = 10;
+	uint64_t tiles_y = 10;
 	main_proxy = thisProxy;
 
 	std::string volume;
@@ -51,8 +51,6 @@ Main::Main(CkArgMsg *msg) : spp(1) {
 			} else if (std::strcmp("--img", msg->argv[i]) == 0) {
 				tiles_x = std::atoi(msg->argv[++i]);
 				tiles_y = std::atoi(msg->argv[++i]);
-			} else if (std::strcmp("--spp", msg->argv[i]) == 0) {
-				spp = std::atoi(msg->argv[++i]);
 			} else if (std::strcmp("--vol", msg->argv[i]) == 0) {
 				volume = msg->argv[++i];
 				dims.x = std::atoi(msg->argv[++i]);
@@ -66,15 +64,33 @@ Main::Main(CkArgMsg *msg) : spp(1) {
 		CkPrintf("Error: A volume file specified with --vol is required.\n%s\n", USAGE.c_str());
 	}
 
-	std::shared_ptr<sv::Volume> vol = sv::load_raw_volume(volume, dims, dtype);
-	CkPrintf("Volume value range: {%f, %f}\n", vol->get_min(), vol->get_max());
-
 	IMAGE_W = TILE_W * tiles_x;
 	IMAGE_H = TILE_H * tiles_y;
+	image.resize(IMAGE_W * IMAGE_H * 3, 0);
+	num_tiles = tiles_x * tiles_y;
 
-	CkExit();
+	CkPrintf("Rendering %dx%d image with %dx%d tile size\n", IMAGE_W, IMAGE_H, TILE_W, TILE_H);
+
+	CProxy_ImageParallelTile img_tiles
+		= CProxy_ImageParallelTile::ckNew(volume, dims, dtype, tiles_x, tiles_y);
+	img_tiles.render();
 }
 Main::Main(CkMigrateMessage *msg) {}
+void Main::tile_done(const uint64_t x, const uint64_t y, const uint8_t *tile) {
+	// Write this tiles data into the image
+	for (uint64_t i = 0; i < TILE_H; ++i) {
+		for (uint64_t j = 0; j < TILE_W; ++j) {
+			for (uint64_t c = 0; c < 3; ++c) {
+				image[((i + y) * IMAGE_W + j + x) * 3 + c] = tile[(i * TILE_W + j) * 3 + c];
+			}
+		}
+	}
+	++done_count;
+	if (done_count == num_tiles) {
+		stbi_write_png("scivis_render.png", IMAGE_W, IMAGE_H, 3, image.data(), IMAGE_W * 3);
+		CkExit();
+	}
+}
 
 #include "main.def.h"
 

@@ -7,8 +7,13 @@ mainmodule main {
 	readonly uint64_t TILE_W;
 	readonly uint64_t TILE_H;
 
+	extern module image_parallel_tile;
+
 	mainchare Main {
 		entry Main(CkArgMsg *msg);
+		// Called by each image-parallel rendering or compositing Chare
+		// when they've finished computing the tile
+		entry void tile_done(const uint64_t x, const uint64_t y, const uint8_t tile[TILE_W * TILE_H * 3]);
 	};
 };
 
