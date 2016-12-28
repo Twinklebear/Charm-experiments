@@ -51,7 +51,7 @@ Main::Main(CkArgMsg *msg) : done_count(0), samples_taken(0), spp(1) {
 	num_tiles = tiles_x * tiles_y;
 	image.resize(IMAGE_W * IMAGE_H, 0);
 
-	CkPrintf("Rendering %dx%d AOBenchbrot set with %dx%d tile size\n"
+	CkPrintf("Rendering %dx%d AOBench with %dx%d tile size\n"
 			"\tSampling: %d samples/pixel, %d AO samples\n",
 			IMAGE_W, IMAGE_H, TILE_W, TILE_H, spp, ao_samples);
 
