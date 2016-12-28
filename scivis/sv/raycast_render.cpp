@@ -1,6 +1,7 @@
 #include <cmath>
 #include <algorithm>
 #include <glm/glm.hpp>
+#include <glm/ext.hpp>
 #include "raycast_render.h"
 
 namespace sv {
@@ -14,16 +15,13 @@ glm::vec4 RaycastRender::render(Ray &ray) const {
 		ray.dir.x < 0 ? 1 : 0, ray.dir.y < 0 ? 1 : 0, ray.dir.z < 0 ? 1 : 0
 	};
 	if (volume->get_bounds().intersect(ray, inv_dir, neg_dir, &ray.t_min, &ray.t_max)) {
-		std::cout << "box hit, t_min = " << ray.t_min << ", t_max = "
-			<< ray.t_max << "\n";
 		return integrate_segment(*volume, ray);
 	} else {
-		return glm::vec4(1.0, 0.0, 0.0, 1.0);
+		return glm::vec4(0.0);
 	}
 }
 glm::vec4 RaycastRender::integrate_segment(const Volume &vol, const Ray &segment) const {
-	const glm::uvec3 vol_dims = vol.get_dims();
-	const float dt = std::min(vol_dims.x, std::min(vol_dims.y, vol_dims.z)) * sampling_rate;
+	const float dt = 1.0 / sampling_rate;
 
 	glm::vec4 color = glm::vec4(0.0);
 	glm::vec3 pos = segment.at(segment.t_min);

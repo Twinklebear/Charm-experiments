@@ -25,10 +25,10 @@ void ImageParallelTile::render() {
 	const uint64_t start_x = thisIndex.x * TILE_W;
 	const uint64_t start_y = thisIndex.y * TILE_H;
 	// TODO: Need a scene data message to send, or struct for the ctor
-	const sv::Camera camera(glm::vec3(151, 151, 600), glm::vec3(151, 151, 151), glm::vec3(0, 1, 0),
+	const sv::Camera camera(glm::vec3(151, 151, 500), glm::vec3(151, 151, 151), glm::vec3(0, 1, 0),
 			65.0, IMAGE_W, IMAGE_H);
 
-	const sv::RaycastRender renderer(1, volume);
+	const sv::RaycastRender renderer(0.5, volume);
 	// Each tile is RGB8 color data
 	uint8_t *tile = new uint8_t[TILE_W * TILE_H * 3];
 	for (uint64_t i = 0; i < TILE_H; ++i) {
