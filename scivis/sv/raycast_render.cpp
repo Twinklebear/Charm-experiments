@@ -13,14 +13,17 @@ glm::vec4 RaycastRender::render(Ray &ray) const {
 	const std::array<int, 3> neg_dir = {
 		ray.dir.x < 0 ? 1 : 0, ray.dir.y < 0 ? 1 : 0, ray.dir.z < 0 ? 1 : 0
 	};
-	volume->get_bounds().intersect(ray, inv_dir, neg_dir, &ray.t_min, &ray.t_max);
-	return integrate_segment(*volume, ray);
+	if (volume->get_bounds().intersect(ray, inv_dir, neg_dir, &ray.t_min, &ray.t_max)) {
+		std::cout << "box hit, t_min = " << ray.t_min << ", t_max = "
+			<< ray.t_max << "\n";
+		return integrate_segment(*volume, ray);
+	} else {
+		return glm::vec4(1.0, 0.0, 0.0, 1.0);
+	}
 }
 glm::vec4 RaycastRender::integrate_segment(const Volume &vol, const Ray &segment) const {
-	const glm::vec3 dt_vec = glm::vec3(1.0 / (vol.get_dims().x * std::abs(segment.dir.x)),
-			1.0 / (vol.get_dims().y * std::abs(segment.dir.y)),
-			1.0 / (vol.get_dims().z * std::abs(segment.dir.z)));
-	const float dt = std::min(dt_vec.x, std::min(dt_vec.y, dt_vec.z)) / sampling_rate;
+	const glm::uvec3 vol_dims = vol.get_dims();
+	const float dt = std::min(vol_dims.x, std::min(vol_dims.y, vol_dims.z)) * sampling_rate;
 
 	glm::vec4 color = glm::vec4(0.0);
 	glm::vec3 pos = segment.at(segment.t_min);

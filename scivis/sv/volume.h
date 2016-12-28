@@ -28,7 +28,7 @@ public:
 	const BBox& get_bounds() const;
 };
 
-enum class VolumeDType {
+enum VolumeDType {
 	UINT8, UINT16, INT32, FLOAT, DOUBLE
 };
 VolumeDType parse_volume_dtype(const std::string &s);

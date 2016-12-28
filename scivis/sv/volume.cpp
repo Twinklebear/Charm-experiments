@@ -15,6 +15,9 @@ const glm::uvec3& Volume::get_offset() const {
 const glm::uvec3& Volume::get_dims() const {
 	return dims;
 }
+const BBox& Volume::get_bounds() const {
+	return bounds;
+}
 
 VolumeDType parse_volume_dtype(const std::string &s) {
 	if (s == "uint8") {

@@ -16,7 +16,7 @@ Camera::Camera(const glm::vec3 &pos, const glm::vec3 &target, const glm::vec3 &_
 	screen_dv = dy * dim_y;
 	dir_top_left = dir - 0.5f * screen_du - 0.5f * screen_dv;
 }
-Ray Camera::generate_ray(const float x, const float y, const std::array<float, 2> samples) const {
+Ray Camera::generate_ray(const float x, const float y, const std::array<float, 2> &samples) const {
 	glm::vec3 dir = dir_top_left;
 	const glm::vec3 u_step = ((x + samples[0]) / width) * screen_du;
 	const glm::vec3 v_step = ((y + samples[1]) / height) * screen_dv;
