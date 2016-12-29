@@ -1,6 +1,6 @@
 module image_parallel_tile {
 	array[2D] ImageParallelTile {
-		entry ImageParallelTile(const std::string vol, glm::uvec3 dims, sv::VolumeDType dtype);
+		entry ImageParallelTile();
 		entry void render();
 	};
 };

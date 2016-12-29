@@ -1,6 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <memory>
+#include "sv/scivis.h"
 
 class Main : public CBase_Main {
 	uint64_t num_tiles;
@@ -14,4 +17,22 @@ public:
 	void tile_done(const uint64_t x, const uint64_t y, const uint8_t *tile);
 };
 
+class SceneMessage : public CMessage_SceneMessage {
+	SceneMessage();
+public:
+	// Info about the volume in the scene
+	std::string vol_file;
+	glm::uvec3 dims;
+	sv::VolumeDType dtype;
+	std::shared_ptr<sv::Volume> volume;
+	// Info about the camera in the scene
+	glm::vec3 cam_pos, cam_target, cam_up;
+
+	SceneMessage(const std::string &vol_file, const glm::uvec3 &dims,
+			sv::VolumeDType dtype, const glm::vec3 &cam_pos, const glm::vec3 &cam_target,
+			const glm::vec3 &cam_up);
+	void msg_pup(PUP::er &p);
+	static void* pack(SceneMessage *msg);
+	static SceneMessage* unpack(void*);
+};
 

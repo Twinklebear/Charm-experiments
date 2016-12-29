@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <pup.h>
 #include "sv/scivis.h"
 
 inline void operator|(PUP::er &p, sv::VolumeDType &dtype) {
@@ -13,7 +14,8 @@ inline void operator|(PUP::er &p, sv::VolumeDType &dtype) {
 		p | t;
 	}
 }
-inline void operator|(PUP::er &p, glm::uvec3 &v) {
+template<typename T>
+inline void operator|(PUP::er &p, glm::detail::tvec3<T, (glm::precision)0> &v) {
 	p | v.x;
 	p | v.y;
 	p | v.z;

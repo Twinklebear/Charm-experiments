@@ -1,5 +1,6 @@
 mainmodule main {
 	readonly CProxy_Main main_proxy;
+	readonly message SceneMessage *scene;
 	// Image dimensions
 	readonly uint64_t IMAGE_W;
 	readonly uint64_t IMAGE_H;
@@ -15,6 +16,8 @@ mainmodule main {
 		// when they've finished computing the tile
 		entry void tile_done(const uint64_t x, const uint64_t y, const uint8_t tile[TILE_W * TILE_H * 3]);
 	};
+
+	message SceneMessage;
 };
 
 
