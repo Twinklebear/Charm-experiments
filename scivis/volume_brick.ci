@@ -1,0 +1,7 @@
+module volume_brick {
+	array[3D] VolumeBrick {
+		entry VolumeBrick();
+		entry void render();
+	};
+};
+
