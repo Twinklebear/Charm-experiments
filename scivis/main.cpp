@@ -6,9 +6,12 @@
 #include <memory>
 
 #include <pup.h>
+#include <glm/glm.hpp>
+#include <glm/ext.hpp>
 #include "sv/scivis.h"
 #include "main.decl.h"
 #include "image_parallel_tile.decl.h"
+#include "volume_brick.decl.h"
 #include "main.h"
 #include "pup_operators.h"
 
@@ -41,7 +44,7 @@ Main::Main(CkArgMsg *msg) : done_count(0) {
 	main_proxy = thisProxy;
 
 	std::string volume;
-	glm::uvec3 dims;
+	glm::uvec3 dims, bricking(0);
 	sv::VolumeDType dtype;
 	glm::vec3 cam_pos(0), cam_target(0), cam_up(0, 1, 0);
 	if (msg->argc > 1) {
@@ -61,6 +64,10 @@ Main::Main(CkArgMsg *msg) : done_count(0) {
 				dims.y = std::atoi(msg->argv[++i]);
 				dims.z = std::atoi(msg->argv[++i]);
 				dtype = sv::parse_volume_dtype(msg->argv[++i]);
+			} else if (std::strcmp("--brick", msg->argv[i]) == 0) {
+				bricking.x = std::atoi(msg->argv[++i]);
+				bricking.y = std::atoi(msg->argv[++i]);
+				bricking.z = std::atoi(msg->argv[++i]);
 			} else if (std::strcmp("--pos", msg->argv[i]) == 0) {
 				cam_pos.x = std::atof(msg->argv[++i]);
 				cam_pos.y = std::atof(msg->argv[++i]);
@@ -91,11 +98,18 @@ Main::Main(CkArgMsg *msg) : done_count(0) {
 	image.resize(IMAGE_W * IMAGE_H * 3, 0);
 	num_tiles = tiles_x * tiles_y;
 
-	scene = new SceneMessage(volume, dims, dtype, cam_pos, cam_target, cam_up);
+	scene = new SceneMessage(volume, dims, bricking, dtype, cam_pos, cam_target, cam_up);
 	CkPrintf("Rendering %dx%d image with %dx%d tile size\n", IMAGE_W, IMAGE_H, TILE_W, TILE_H);
 
-	CProxy_ImageParallelTile img_tiles = CProxy_ImageParallelTile::ckNew(tiles_x, tiles_y);
-	img_tiles.render();
+	if (!scene->data_parallel()) {
+		CkPrintf("Rendering image-parallel\n");
+		CProxy_ImageParallelTile img_tiles = CProxy_ImageParallelTile::ckNew(tiles_x, tiles_y);
+		img_tiles.render();
+	} else {
+		CkPrintf("Rendering data-parallel with %dx%dx%d bricking\n", bricking.x, bricking.y, bricking.z);
+		CProxy_VolumeBrick bricks = CProxy_VolumeBrick::ckNew(bricking.x, bricking.y, bricking.z);
+		bricks.render();
+	}
 }
 Main::Main(CkMigrateMessage *msg) {}
 void Main::tile_done(const uint64_t x, const uint64_t y, const uint8_t *tile) {
@@ -113,24 +127,36 @@ void Main::tile_done(const uint64_t x, const uint64_t y, const uint8_t *tile) {
 		CkExit();
 	}
 }
+void Main::brick_done() {
+	++done_count;
+	if (done_count == scene->bricking.x * scene->bricking.y * scene->bricking.z) {
+		CkPrintf("All bricks reported done\n");
+		CkExit();
+	}
+}
 
 SceneMessage::SceneMessage() {}
-SceneMessage::SceneMessage(const std::string &vol_file, const glm::uvec3 &dims,
+SceneMessage::SceneMessage(const std::string &vol_file, const glm::uvec3 &dims, const glm::uvec3 &bricking,
 		sv::VolumeDType dtype, const glm::vec3 &cam_pos, const glm::vec3 &cam_target,
 		const glm::vec3 &cam_up)
-	: vol_file(vol_file), dims(dims), dtype(dtype), cam_pos(cam_pos), cam_target(cam_target), cam_up(cam_up)
+	: vol_file(vol_file), dims(dims), bricking(bricking), dtype(dtype),
+	cam_pos(cam_pos), cam_target(cam_target), cam_up(cam_up)
 {}
 void SceneMessage::msg_pup(PUP::er &p) {
 	p | vol_file;
 	p | dims;
+	p | bricking;
 	p | dtype;
 	p | cam_pos;
 	p | cam_target;
 	p | cam_up;
-	if (p.isUnpacking()) {
+	if (p.isUnpacking() && !data_parallel()) {
 		CkPrintf("SceneMessage unpacking and allocating volume\n");
 		volume = sv::load_raw_volume(scene->vol_file, scene->dims, scene->dtype);
 	}
+}
+bool SceneMessage::data_parallel() const {
+	return bricking != glm::uvec3(0);
 }
 void* SceneMessage::pack(SceneMessage *msg) {
 	PUP::sizer sizer;
