@@ -23,7 +23,6 @@ void ImageParallelTile::render() {
 	const uint64_t tiles_x = IMAGE_W / TILE_W;
 	const uint64_t start_x = thisIndex.x * TILE_W;
 	const uint64_t start_y = thisIndex.y * TILE_H;
-	// TODO: Need a scene data message to send, or struct for the ctor
 	const sv::Camera camera(scene->cam_pos, scene->cam_target, scene->cam_up, 65.0, IMAGE_W, IMAGE_H);
 
 	const sv::RaycastRender renderer(0.5, scene->volume);
