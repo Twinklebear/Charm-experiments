@@ -22,7 +22,6 @@ glm::vec4 RaycastRender::render(Ray &ray) const {
 }
 glm::vec4 RaycastRender::integrate_segment(const Volume &vol, const Ray &segment) const {
 	const float dt = 1.0 / sampling_rate;
-
 	glm::vec4 color = glm::vec4(0.0);
 	glm::vec3 pos = segment.at(segment.t_min);
 	for (float t = segment.t_min; t < segment.t_max; t += dt) {
