@@ -22,10 +22,11 @@ glm::vec4 RaycastRender::render(Ray &ray) const {
 }
 glm::vec4 RaycastRender::integrate_segment(const Volume &vol, const Ray &segment) const {
 	const float dt = 1.0 / sampling_rate;
+	const glm::vec3 vol_offset(vol.get_offset());
 	glm::vec4 color = glm::vec4(0.0);
 	glm::vec3 pos = segment.at(segment.t_min);
 	for (float t = segment.t_min; t < segment.t_max; t += dt) {
-		const float value = (vol.sample(pos) - vol.get_min()) / (vol.get_max() - vol.get_min());
+		const float value = (vol.sample(pos - vol_offset) - vol.get_min()) / (vol.get_max() - vol.get_min());
 		// TODO: Actual transfer function, this is just a grayscale ramp
 		glm::vec4 tfn_sample = glm::vec4(value);
 		glm::vec3 col = (1.f - color.w) * tfn_sample.w * glm::vec3(tfn_sample);

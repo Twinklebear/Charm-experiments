@@ -1,6 +1,7 @@
 #include <fstream>
 #include <string>
 #include <iostream>
+#include <glm/ext.hpp>
 #include "volume.h"
 
 namespace sv {
@@ -56,14 +57,17 @@ std::shared_ptr<Volume> load_raw_volume(const std::string &fname, const glm::uve
 {
 	std::ifstream fin{fname.c_str(), std::ios::binary};
 	const glm::uvec3 load_dims = subregion_dims == glm::uvec3(0) ? dims : subregion_dims;
-	std::vector<uint8_t> vol_data(load_dims.x * load_dims.y * load_dims.z * dtype_size(dtype), 0);
+	const size_t dsize = dtype_size(dtype);
+	std::vector<uint8_t> vol_data(load_dims.x * load_dims.y * load_dims.z * dsize, 0);
 
 	// Go through and read scanlines of the volume until we read the subregion we're loading
-	for (size_t z = offset.z; z < offset.z + load_dims.z; ++z) {
-		for (size_t y = offset.y; y < offset.y + load_dims.y; ++y) {
-			fin.seekg((z * dims.y + y) * dims.x + offset.x);
-			const size_t i = (z * load_dims.y + y) * load_dims.x * dtype_size(dtype);
-			fin.read(reinterpret_cast<char*>(&vol_data[i]), (load_dims.x - offset.x) * dtype_size(dtype));
+	for (size_t z = 0; z < load_dims.z; ++z) {
+		for (size_t y = 0; y < load_dims.y; ++y) {
+			const size_t vz = z + offset.z;
+			const size_t vy = y + offset.y;
+			fin.seekg(((vz * dims.y + vy) * dims.x + offset.x) * dsize);
+			const size_t i = (z * load_dims.y + y) * load_dims.x * dsize;
+			fin.read(reinterpret_cast<char*>(&vol_data[i]), load_dims.x * dsize);
 		}
 	}
 
