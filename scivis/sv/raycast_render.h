@@ -15,9 +15,8 @@ class RaycastRender {
 public:
 	RaycastRender(float sampling_rate, std::shared_ptr<Volume> volume);
 	glm::vec4 render(Ray &ray) const;
-
-private:
-	glm::vec4 integrate_segment(const Volume &volume, const Ray &segment) const;
+	glm::vec4 integrate_segment(const Ray &segment) const;
+	float get_sampling_rate() const;
 };
 
 }

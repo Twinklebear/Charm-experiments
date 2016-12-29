@@ -15,18 +15,19 @@ glm::vec4 RaycastRender::render(Ray &ray) const {
 		ray.dir.x < 0 ? 1 : 0, ray.dir.y < 0 ? 1 : 0, ray.dir.z < 0 ? 1 : 0
 	};
 	if (volume->get_bounds().intersect(ray, inv_dir, neg_dir, &ray.t_min, &ray.t_max)) {
-		return integrate_segment(*volume, ray);
+		return integrate_segment(ray);
 	} else {
 		return glm::vec4(0.0);
 	}
 }
-glm::vec4 RaycastRender::integrate_segment(const Volume &vol, const Ray &segment) const {
+glm::vec4 RaycastRender::integrate_segment(const Ray &segment) const {
 	const float dt = 1.0 / sampling_rate;
-	const glm::vec3 vol_offset(vol.get_offset());
+	const glm::vec3 vol_offset(volume->get_offset());
 	glm::vec4 color = glm::vec4(0.0);
 	glm::vec3 pos = segment.at(segment.t_min);
 	for (float t = segment.t_min; t < segment.t_max; t += dt) {
-		const float value = (vol.sample(pos - vol_offset) - vol.get_min()) / (vol.get_max() - vol.get_min());
+		const float value = (volume->sample(pos - vol_offset) - volume->get_min())
+			/ (volume->get_max() - volume->get_min());
 		// TODO: Actual transfer function, this is just a grayscale ramp
 		glm::vec4 tfn_sample = glm::vec4(value);
 		glm::vec3 col = (1.f - color.w) * tfn_sample.w * glm::vec3(tfn_sample);
@@ -40,6 +41,9 @@ glm::vec4 RaycastRender::integrate_segment(const Volume &vol, const Ray &segment
 		pos += dt * segment.dir;
 	}
 	return color;
+}
+float RaycastRender::get_sampling_rate() const {
+	return sampling_rate;
 }
 
 }
