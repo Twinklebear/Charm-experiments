@@ -144,6 +144,7 @@ void Main::brick_tile_done(const uint64_t tile_x, const uint64_t tile_y, const f
 				// Note: I don't think sorting by depth per-pixel is actually needed for pure
 				// distributed volume rendering b/c the sort can be done on the brick level. However
 				// I think for mixed volume and geometry data you do need this?
+				// It might not actually be necessary even for mixed volume and geometry data?
 				std::vector<Fragment> fragments;
 				for (const auto &t : brick_tiles[tid]) {
 					const float *vals = &t[(i * TILE_W + j) * 5];
