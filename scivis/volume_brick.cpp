@@ -38,9 +38,8 @@ void VolumeBrick::render() {
 	const sv::Camera camera(scene->cam_pos, scene->cam_target, scene->cam_up, 65.0, IMAGE_W, IMAGE_H);
 
 	const sv::RaycastRender renderer(0.5, volume);
-	// Each tile is RGB8 color data
-	//uint8_t *tile = new uint8_t[TILE_W * TILE_H * 3];
-	uint8_t *image = new uint8_t[IMAGE_W * IMAGE_H * 3];
+	// Each tile is RGBAZF32 data
+	float *tile = new float[TILE_W * TILE_H * 5];
 	for (uint64_t y = 0; y < tiles_y; ++y) {
 		for (uint64_t x = 0; x < tiles_x; ++x) {
 			const uint64_t start_x = x * TILE_W;
@@ -51,20 +50,16 @@ void VolumeBrick::render() {
 					const float py = i + start_y;
 					sv::Ray ray = camera.generate_ray(px, py, {0.5, 0.5});
 					const glm::vec4 vol_color = renderer.render(ray);
-					glm::vec3 col = glm::vec3(vol_color) + (1.f - vol_color.w) * glm::vec3(1);
-					// Composite onto the background color
-					for (size_t c = 0; c < 3; ++c) {
-						image[((i + start_y) * IMAGE_W + j + start_x) * 3 + c] = col[c] * 255.f;
+					for (size_t c = 0; c < 4; ++c) {
+						tile[(i * TILE_W + j) * 5 + c] = vol_color[c];
 					}
+					tile[(i * TILE_W + j) * 5 + 4] = ray.t_max;
 				}
 			}
+			main_proxy.brick_tile_done(x, y, tile);
 		}
 	}
-	const std::string brick_outname = "scivis_render" + std::to_string(thisIndex.x)
-		+ "x" + std::to_string(thisIndex.y) + "x" + std::to_string(thisIndex.z) + ".png";
-	stbi_write_png(brick_outname.c_str(), IMAGE_W, IMAGE_H, 3, image, IMAGE_W * 3);
-	delete[] image;
-	main_proxy.brick_done();
+	delete[] tile;
 }
 
 #include "volume_brick.def.h"

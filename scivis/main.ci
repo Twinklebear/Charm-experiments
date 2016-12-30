@@ -16,8 +16,8 @@ mainmodule main {
 		// Called by each image-parallel rendering or compositing Chare
 		// when they've finished computing the tile
 		entry void tile_done(const uint64_t x, const uint64_t y, const uint8_t tile[TILE_W * TILE_H * 3]);
-		// Dummy method for testing, just called when a brick is done so we know to quit
-		entry void brick_done();
+		entry void brick_tile_done(const uint64_t tile_x, const uint64_t tile_y,
+				const float tile[TILE_W * TILE_H * 5]);
 	};
 
 	message SceneMessage;

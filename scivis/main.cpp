@@ -1,4 +1,6 @@
 #include <iostream>
+#include <utility>
+#include <algorithm>
 #include <cstring>
 #include <cstdio>
 #include <string>
@@ -106,6 +108,7 @@ Main::Main(CkArgMsg *msg) : done_count(0) {
 		CProxy_ImageParallelTile img_tiles = CProxy_ImageParallelTile::ckNew(tiles_x, tiles_y);
 		img_tiles.render();
 	} else {
+		brick_tiles.resize(tiles_x * tiles_y);
 		CkPrintf("Rendering data-parallel with %dx%dx%d bricking\n", bricking.x, bricking.y, bricking.z);
 		CProxy_VolumeBrick bricks = CProxy_VolumeBrick::ckNew(bricking.x, bricking.y, bricking.z);
 		bricks.render();
@@ -127,11 +130,55 @@ void Main::tile_done(const uint64_t x, const uint64_t y, const uint8_t *tile) {
 		CkExit();
 	}
 }
-void Main::brick_done() {
-	++done_count;
-	if (done_count == scene->bricking.x * scene->bricking.y * scene->bricking.z) {
-		CkPrintf("All bricks reported done\n");
-		CkExit();
+void Main::brick_tile_done(const uint64_t tile_x, const uint64_t tile_y, const float *tile) {
+	const size_t tid = tile_y * (IMAGE_W / TILE_W) + tile_x;
+	brick_tiles[tid].emplace_back(tile, tile + TILE_W * TILE_H * 5);
+	// If we've finished this tile, composite it and write it to the final framebuffer
+	const uint64_t start_x = tile_x * TILE_W;
+	const uint64_t start_y = tile_y * TILE_H;
+	if (brick_tiles[tid].size() == scene->num_bricks()) {
+		using Fragment = std::pair<glm::vec4, float>;
+		for (uint64_t i = 0; i < TILE_H; ++i) {
+			for (uint64_t j = 0; j < TILE_W; ++j) {
+				// Collect and sort the fragments for this pixel
+				// Note: I don't think sorting by depth per-pixel is actually needed for pure
+				// distributed volume rendering b/c the sort can be done on the brick level. However
+				// I think for mixed volume and geometry data you do need this?
+				std::vector<Fragment> fragments;
+				for (const auto &t : brick_tiles[tid]) {
+					const float *vals = &t[(i * TILE_W + j) * 5];
+					fragments.push_back(std::make_pair(glm::vec4(vals[0], vals[1], vals[2], vals[3]), vals[4]));
+				}
+				std::sort(fragments.begin(), fragments.end(),
+					[](const Fragment &a, const Fragment &b) {
+						return a.second < b.second;
+					});
+				// Blend the fragments and write to the final image
+				glm::vec4 color = glm::vec4(0);
+				for (const auto &f : fragments) {
+					glm::vec3 col = (1.f - color.w) * f.first.w * glm::vec3(f.first);
+					color.x += col.x;
+					color.y += col.y;
+					color.z += col.z;
+					color.w += (1.0 - color.w) * f.first.w;
+					if (color.w >= 0.98) {
+						break;
+					}
+				}
+				// Composite onto the background
+				glm::vec3 final_col = glm::vec3(color) + (1.f - color.w) * glm::vec3(1);
+				for (int c = 0; c < 3; ++c) {
+					image[((i + start_y) * IMAGE_W + j + start_x) * 3 + c] = final_col[c] * 255.f;
+				}
+			}
+		}
+		// Release the tiles since we no longer need them
+		brick_tiles[tid].clear();
+		++done_count;
+		if (done_count == num_tiles) {
+			stbi_write_png("scivis_render.png", IMAGE_W, IMAGE_H, 3, image.data(), IMAGE_W * 3);
+			CkExit();
+		}
 	}
 }
 
@@ -157,6 +204,9 @@ void SceneMessage::msg_pup(PUP::er &p) {
 }
 bool SceneMessage::data_parallel() const {
 	return bricking != glm::uvec3(0);
+}
+uint64_t SceneMessage::num_bricks() const {
+	return bricking.x * bricking.y * bricking.z;
 }
 void* SceneMessage::pack(SceneMessage *msg) {
 	PUP::sizer sizer;
