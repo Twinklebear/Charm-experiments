@@ -1,0 +1,8 @@
+module image_parallel_tile {
+	array[2D] ImageParallelTile {
+		entry ImageParallelTile();
+		entry void render();
+	};
+};
+
+
