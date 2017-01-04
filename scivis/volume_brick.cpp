@@ -61,6 +61,30 @@ void VolumeBrick::render() {
 	}
 	delete[] tile;
 }
+/*
+// TODO: Setup a custom reduction that will be reported back to main when we find the min/max
+// then it sends out the min/max to a sync set_min_max entry method and tells all the bricks
+// to render. Or we can use the completion detection?
+void VolumeBrick::find_min_max() {
+	CkCallback min_cb(CkReductionTarget(VolumeBrick, collect_min), thisProxy(0, 0, 0));
+	float min_val = volume->get_min();
+	contribute(sizeof(float), &min_val, CkReduction::min_float, min_cb);
+
+	CkCallback max_cb(CkReductionTarget(VolumeBrick, collect_max), thisProxy(0, 0, 0));
+	float max_val = volume->get_max();
+	contribute(sizeof(float), &max_val, CkReduction::max_float, max_cb);
+	CkPrintf("VolumeBrick [%d, %d, %d] local range = [%f, %f] contributed\n",
+			thisIndex.x, thisIndex.y, thisIndex.z, volume->get_min(), volume->get_max());
+}
+void VolumeBrick::collect_min(float x) {
+	CkPrintf("VolumeBrick [%d, %d, %d] local range = [%f, %f] now got global min %f\n",
+			thisIndex.x, thisIndex.y, thisIndex.z, volume->get_min(), volume->get_max(), x);
+}
+void VolumeBrick::collect_max(float x) {
+	CkPrintf("VolumeBrick [%d, %d, %d] local range = [%f, %f] now got global max %f\n",
+			thisIndex.x, thisIndex.y, thisIndex.z, volume->get_min(), volume->get_max(), x);
+}
+*/
 
 #include "volume_brick.def.h"
 
