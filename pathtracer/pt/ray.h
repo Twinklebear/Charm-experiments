@@ -3,7 +3,7 @@
 #include <limits>
 #include <glm/glm.hpp>
 
-namespace sv {
+namespace pt {
 
 struct Ray {
 	glm::vec3 origin, dir;

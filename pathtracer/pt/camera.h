@@ -4,7 +4,7 @@
 #include <glm/glm.hpp>
 #include "ray.h"
 
-namespace sv {
+namespace pt {
 
 class Camera {
 	size_t width, height;

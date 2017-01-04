@@ -3,7 +3,7 @@
 #include <glm/glm.hpp>
 #include "ray.h"
 
-namespace sv {
+namespace pt {
 
 struct BBox {
 	glm::vec3 min, max;

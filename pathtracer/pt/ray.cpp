@@ -1,6 +1,6 @@
 #include "ray.h"
 
-namespace sv {
+namespace pt {
 
 Ray::Ray(const glm::vec3 &origin, const glm::vec3 &dir, const float t_min, const float t_max)
 	: origin(origin), dir(dir), t_min(t_min), t_max(t_max)

@@ -1,7 +1,7 @@
 #include <cmath>
 #include "camera.h"
 
-namespace sv {
+namespace pt {
 
 Camera::Camera(const glm::vec3 &pos, const glm::vec3 &target, const glm::vec3 &_up, const float fov_y,
 		const size_t width, const size_t height)
