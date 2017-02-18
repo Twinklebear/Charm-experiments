@@ -45,6 +45,7 @@ void ImageParallelTile::render() {
 		}
 	}
 	main_proxy.tile_done(start_x, start_y, tile);
+	delete[] tile;
 }
 
 #include "image_parallel_tile.def.h"
