@@ -5,6 +5,7 @@
 #include "diff_geom.h"
 #include "hit_integrator.h"
 #include "normal_integrator.h"
+#include "whitted_integrator.h"
 #include "ray.h"
 #include "sphere.h"
 
