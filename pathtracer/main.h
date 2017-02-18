@@ -24,6 +24,7 @@ public:
 
 class SceneMessage : public CMessage_SceneMessage {
 	SceneMessage();
+
 public:
 	// Info about the camera in the scene
 	glm::vec3 cam_pos, cam_target, cam_up;
