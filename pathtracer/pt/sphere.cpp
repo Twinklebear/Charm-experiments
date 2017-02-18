@@ -1,5 +1,4 @@
 #include <cmath>
-#include <cassert>
 #include "sphere.h"
 
 namespace pt {
@@ -9,7 +8,7 @@ bool Sphere::intersect(Ray &ray, DifferentialGeometry &dg) const {
 	const float a = glm::dot(ray.dir, ray.dir);
 	const float b = 2.0 * glm::dot(ray.dir, ray.origin);
 	const float c = glm::dot(ray.origin, ray.origin) - radius * radius;
-	const float discrim = b * b - c;
+	const float discrim = b * b - 4.0 * a * c;
 	if (discrim > 0.f){
 		float t = (-b - std::sqrt(discrim)) / (2.0 * a);
 		if (t > ray.t_min && t < ray.t_max){
