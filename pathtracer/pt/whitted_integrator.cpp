@@ -15,7 +15,7 @@ glm::vec3 WhittedIntegrator::integrate(Ray &ray) const {
 		const glm::vec3 ambient_light(0.1);
 		const glm::vec3 light_dir = glm::normalize(glm::vec3(1, 1, 1));
 		const glm::vec3 light_color(0.8);
-		
+
 		const glm::vec3 half_vec = glm::normalize(light_dir - ray.dir);
 		const glm::vec3 diffuse_color(0.1, 0.1, 0.8);
 		const glm::vec3 specular_color(0.2);
