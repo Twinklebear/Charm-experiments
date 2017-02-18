@@ -13,7 +13,7 @@ Camera::Camera(const glm::vec3 &pos, const glm::vec3 &target, const glm::vec3 &_
 	const float aspect_ratio = width / static_cast<float>(height);
 	const float dim_x = dim_y * aspect_ratio;
 	screen_du = dx * dim_x;
-	screen_dv = dy * dim_y;
+	screen_dv = -dy * dim_y;
 	dir_top_left = dir - 0.5f * screen_du - 0.5f * screen_dv;
 }
 Ray Camera::generate_ray(const float x, const float y, const std::array<float, 2> &samples) const {
