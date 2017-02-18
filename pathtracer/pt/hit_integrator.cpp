@@ -3,13 +3,11 @@
 
 namespace pt {
 
-HitIntegrator::HitIntegrator(const std::vector<Sphere> &scene) : scene(scene) {}
+HitIntegrator::HitIntegrator(Scene scene) : scene(std::move(scene)) {}
 glm::vec3 HitIntegrator::integrate(Ray &ray) const {
-	for (const auto &s : scene) {
-		DifferentialGeometry dg;
-		if (s.intersect(ray, dg)) {
-			return glm::vec3(1);
-		}
+	DifferentialGeometry dg;
+	if (scene.intersect(ray, dg)) {
+		return glm::vec3(1);
 	}
 	return glm::vec3(0);
 }

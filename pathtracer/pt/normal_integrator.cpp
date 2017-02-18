@@ -3,14 +3,10 @@
 
 namespace pt {
 
-NormalIntegrator::NormalIntegrator(const std::vector<Sphere> &scene) : scene(scene) {}
+NormalIntegrator::NormalIntegrator(Scene scene) : scene(std::move(scene)) {}
 glm::vec3 NormalIntegrator::integrate(Ray &ray) const {
 	DifferentialGeometry dg;
-	bool hit = false;
-	for (const auto &s : scene) {
-		hit = s.intersect(ray, dg) || hit;
-	}
-	if (hit) {
+	if (scene.intersect(ray, dg)) {
 		return (glm::vec3(1) + dg.normal) * 0.5f;
 	}
 	return glm::vec3(0);

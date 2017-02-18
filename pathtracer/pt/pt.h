@@ -7,7 +7,9 @@
 #include "normal_integrator.h"
 #include "whitted_integrator.h"
 #include "ray.h"
+#include "geometry.h"
 #include "sphere.h"
+#include "scene.h"
 
 #include "stb_image.h"
 #include "stb_image_write.h"

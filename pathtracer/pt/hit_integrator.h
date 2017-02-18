@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <glm/glm.hpp>
-#include "sphere.h"
+#include "scene.h"
 #include "ray.h"
 
 namespace pt {
@@ -11,10 +11,10 @@ namespace pt {
  * was hit, and black if not
  */
 class HitIntegrator {
-	std::vector<Sphere> scene;
+	Scene scene;
 
 public:
-	HitIntegrator(const std::vector<Sphere> &scene);
+	HitIntegrator(Scene scene);
 	glm::vec3 integrate(Ray &ray) const;
 };
 

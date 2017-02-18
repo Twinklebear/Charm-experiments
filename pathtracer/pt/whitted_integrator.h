@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <glm/glm.hpp>
-#include "sphere.h"
+#include "scene.h"
 #include "ray.h"
 
 namespace pt {
@@ -11,10 +11,10 @@ namespace pt {
  * recursive ray tracing.
  */
 class WhittedIntegrator {
-	std::vector<Sphere> scene;
+	Scene scene;
 
 public:
-	WhittedIntegrator(const std::vector<Sphere> &scene);
+	WhittedIntegrator(Scene scene);
 	glm::vec3 integrate(Ray &ray) const;
 };
 

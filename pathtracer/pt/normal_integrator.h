@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <glm/glm.hpp>
-#include "sphere.h"
+#include "scene.h"
 #include "ray.h"
 
 namespace pt {
@@ -10,10 +10,10 @@ namespace pt {
 /* The normal integrator colors hit objects by their normal
  */
 class NormalIntegrator {
-	std::vector<Sphere> scene;
+	Scene scene;
 
 public:
-	NormalIntegrator(const std::vector<Sphere> &scene);
+	NormalIntegrator(Scene scene);
 	glm::vec3 integrate(Ray &ray) const;
 };
 

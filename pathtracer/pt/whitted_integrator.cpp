@@ -3,14 +3,10 @@
 
 namespace pt {
 
-WhittedIntegrator::WhittedIntegrator(const std::vector<Sphere> &scene) : scene(scene) {}
+WhittedIntegrator::WhittedIntegrator(Scene scene) : scene(std::move(scene)) {}
 glm::vec3 WhittedIntegrator::integrate(Ray &ray) const {
 	DifferentialGeometry dg;
-	bool hit = false;
-	for (const auto &s : scene) {
-		hit = s.intersect(ray, dg) || hit;
-	}
-	if (hit) {
+	if (scene.intersect(ray, dg)) {
 		// TODO: Don't do a hard-coded Blinn-Phong lighting model
 		const glm::vec3 ambient_light(0.1);
 		const glm::vec3 light_dir = glm::normalize(glm::vec3(1, 1, 1));
