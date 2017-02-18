@@ -1,5 +1,8 @@
 #pragma once
 
+#include <memory>
+#include <utility>
+
 #include "camera.h"
 #include "bbox.h"
 #include "diff_geom.h"

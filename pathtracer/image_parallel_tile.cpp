@@ -30,9 +30,9 @@ void ImageParallelTile::render() {
 	// Maybe for transparency we'd want floating point alpha and color?
 	uint8_t *tile = new uint8_t[TILE_W * TILE_H * 3];
 	const pt::WhittedIntegrator integrator(pt::Scene({
-		std::make_unique<pt::Sphere>(glm::vec3(0), 1.0),
-		std::make_unique<pt::Sphere>(glm::vec3(0.25, 1.0, -0.5), 0.5)
-	});
+		std::make_shared<pt::Sphere>(glm::vec3(0), 1.0),
+		std::make_shared<pt::Sphere>(glm::vec3(0.25, 1.0, -0.5), 0.5)
+	}));
 	for (uint64_t i = 0; i < TILE_H; ++i) {
 		for (uint64_t j = 0; j < TILE_W; ++j) {
 			const float px = j + start_x;
