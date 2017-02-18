@@ -13,6 +13,7 @@
 #include "geometry.h"
 #include "sphere.h"
 #include "scene.h"
+#include "light.h"
 
 #include "stb_image.h"
 #include "stb_image_write.h"
