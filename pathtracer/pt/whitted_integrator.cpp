@@ -18,7 +18,9 @@ glm::vec3 WhittedIntegrator::integrate(Ray &ray) const {
 		const float spec_exponent = 50;
 
 		glm::vec3 lighting = ambient_light * diffuse_color;
-		if (glm::dot(light_dir, dg.normal) > 0.0) {
+		DifferentialGeometry occluded_dg;
+		Ray occlusion_test(dg.point, light_dir, 0.001);
+		if (glm::dot(light_dir, dg.normal) > 0.0 && !scene.intersect(occlusion_test, occluded_dg)) {
 			lighting += diffuse_color * light_color * glm::dot(light_dir, dg.normal)
 				+ specular_color * light_color * std::pow(glm::dot(dg.normal, half_vec), spec_exponent);
 		}

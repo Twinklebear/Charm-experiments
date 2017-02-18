@@ -31,7 +31,8 @@ void ImageParallelTile::render() {
 	uint8_t *tile = new uint8_t[TILE_W * TILE_H * 3];
 	const pt::WhittedIntegrator integrator(pt::Scene({
 		std::make_shared<pt::Sphere>(glm::vec3(0), 1.0),
-		std::make_shared<pt::Sphere>(glm::vec3(0.25, 1.0, -0.5), 0.5)
+		std::make_shared<pt::Sphere>(glm::vec3(0.25, 0.7, 1.0), 0.25),
+		std::make_shared<pt::Sphere>(glm::vec3(0, -4.5, -1), 4)
 	}));
 	for (uint64_t i = 0; i < TILE_H; ++i) {
 		for (uint64_t j = 0; j < TILE_W; ++j) {
