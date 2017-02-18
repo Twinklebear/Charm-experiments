@@ -27,22 +27,18 @@ void ImageParallelTile::render() {
 
 	// Each tile is RGB8 color data
 	uint8_t *tile = new uint8_t[TILE_W * TILE_H * 3];
-	/*
-	const sv::RaycastRender renderer(0.5, scene->volume);
+	const pt::HitIntegrator integrator({pt::Sphere(glm::vec3(0), 1.0)});
 	for (uint64_t i = 0; i < TILE_H; ++i) {
 		for (uint64_t j = 0; j < TILE_W; ++j) {
 			const float px = j + start_x;
 			const float py = i + start_y;
-			sv::Ray ray = camera.generate_ray(px, py, {0.5, 0.5});
-			const glm::vec4 vol_color = renderer.render(ray);
-			glm::vec3 col = glm::vec3(vol_color) + (1.f - vol_color.w) * glm::vec3(1);
-			// Composite onto the background color
+			pt::Ray ray = camera.generate_ray(px, py, {0.5, 0.5});
+			const glm::vec3 color = integrator.integrate(ray);
 			for (size_t c = 0; c < 3; ++c) {
-				tile[(i * TILE_W + j) * 3 + c] = col[c] * 255.f;
+				tile[(i * TILE_W + j) * 3 + c] = color[c] * 255.f;
 			}
 		}
 	}
-	*/
 	main_proxy.tile_done(start_x, start_y, tile);
 }
 
