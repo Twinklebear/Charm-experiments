@@ -15,6 +15,7 @@
 #include "plane.h"
 #include "scene.h"
 #include "light.h"
+#include "brdf.h"
 
 #include "stb_image.h"
 #include "stb_image_write.h"
