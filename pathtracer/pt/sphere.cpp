@@ -17,6 +17,11 @@ bool Sphere::intersect(Ray &ray, DifferentialGeometry &dg) const {
 			ray.t_max = t;
 			dg.point = ray.origin + ray.dir * t;
 			dg.normal = glm::normalize(dg.point - center);
+			// Compute the tangent and bitangent
+			// Note: b/c none of the materials depend on the tanget/bitangent
+			// orientation being consistent this should be fine, we just need some
+			// sort of shading coordinate frame
+			coordinate_system(dg.normal, dg.tangent, dg.bitangent);
 			return true;
 		} else {
 			t = (-b + std::sqrt(discrim)) / (2.0 * a);
@@ -24,6 +29,7 @@ bool Sphere::intersect(Ray &ray, DifferentialGeometry &dg) const {
 				ray.t_max = t;
 				dg.point = ray.origin + ray.dir * t;
 				dg.normal = glm::normalize(dg.point - center);
+				coordinate_system(dg.normal, dg.tangent, dg.bitangent);
 				return true;
 			}
 		}

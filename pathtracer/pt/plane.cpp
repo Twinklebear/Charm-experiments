@@ -15,6 +15,8 @@ bool Plane::intersect(Ray &ray, DifferentialGeometry &dg) const {
 		ray.t_max = t;
 		dg.point = ray.origin + ray.dir * t;
 		dg.normal = normal;
+		// Compute the tangent and bitangent
+		coordinate_system(normal, dg.tangent, dg.bitangent);
 		return true;
 	}
 	return false;
