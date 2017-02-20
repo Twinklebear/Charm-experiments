@@ -31,5 +31,13 @@ public:
 	LightSample incident(const glm::vec3 &pt) const override;
 };
 
+class PointLight : public Light {
+	glm::vec3 position, illum;
+
+public:
+	PointLight(const glm::vec3 &position, const glm::vec3 &illum);
+	LightSample incident(const glm::vec3 &pt) const override;
+};
+
 }
 

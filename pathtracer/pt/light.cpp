@@ -1,3 +1,4 @@
+#include <glm/ext.hpp>
 #include "diff_geom.h"
 #include "light.h"
 
@@ -17,6 +18,12 @@ DirectionalLight::DirectionalLight(const glm::vec3 &dir, const glm::vec3 &illum)
 {}
 LightSample DirectionalLight::incident(const glm::vec3 &pt) const {
 	return LightSample(illum, -dir, Ray(pt, -dir, 0.001));
+}
+
+PointLight::PointLight(const glm::vec3 &position, const glm::vec3 &illum) : position(position), illum(illum) {}
+LightSample PointLight::incident(const glm::vec3 &pt) const {
+	const glm::vec3 dir = position - pt;
+	return LightSample(illum / glm::length2(dir), glm::normalize(dir), Ray(pt, dir, 0.001, 0.999));
 }
 
 }
