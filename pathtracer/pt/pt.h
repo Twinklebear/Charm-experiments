@@ -12,6 +12,7 @@
 #include "ray.h"
 #include "geometry.h"
 #include "sphere.h"
+#include "plane.h"
 #include "scene.h"
 #include "light.h"
 
