@@ -11,5 +11,8 @@ public:
 	virtual bool intersect(Ray &ray, DifferentialGeometry &dg) const = 0;
 };
 
+// Compute an orthonormal coordinate system with e1 as one of the axes
+void coordinate_system(const glm::vec3 &e1, glm::vec3 &e2, glm::vec3 &e3);
+
 }
 
