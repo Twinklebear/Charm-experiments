@@ -32,7 +32,7 @@ void ImageParallelTile::render() {
 	const pt::WhittedIntegrator integrator(pt::Scene({
 		std::make_shared<pt::Sphere>(glm::vec3(0), 1.0),
 		std::make_shared<pt::Sphere>(glm::vec3(0.25, 0.7, 1.0), 0.25),
-		std::make_shared<pt::Sphere>(glm::vec3(0, -4.5, -1), 4)
+		std::make_shared<pt::Plane>(glm::vec3(0, -1, 0), glm::vec3(0, 1, 0))
 	}));
 	for (uint64_t i = 0; i < TILE_H; ++i) {
 		for (uint64_t j = 0; j < TILE_W; ++j) {
