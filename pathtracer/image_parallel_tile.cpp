@@ -17,6 +17,20 @@ extern uint64_t IMAGE_H;
 extern uint64_t TILE_W;
 extern uint64_t TILE_H;
 
+glm::vec3 linear_to_srgb(const glm::vec3 &v) {
+	const float a = 0.055;
+	const float b = 1.f / 2.4f;
+	glm::vec3 srgb(0);
+	for (size_t i = 0; i < 3; ++i) {
+		if (v[i] <= 0.0031308) {
+			srgb[i] = 12.92 * v[i];
+		} else {
+			srgb[i] = (1.0 + a) * std::pow(v[i], b) - a;
+		}
+	}
+	return srgb;
+}
+
 ImageParallelTile::ImageParallelTile() {}
 ImageParallelTile::ImageParallelTile(CkMigrateMessage *msg) {}
 void ImageParallelTile::render() {
@@ -39,9 +53,9 @@ void ImageParallelTile::render() {
 			const float px = j + start_x;
 			const float py = i + start_y;
 			pt::Ray ray = camera.generate_ray(px, py, {0.5, 0.5});
-			const glm::vec3 color = integrator.integrate(ray);
+			const glm::vec3 color = linear_to_srgb(integrator.integrate(ray));
 			for (size_t c = 0; c < 3; ++c) {
-				tile[(i * TILE_W + j) * 3 + c] = color[c] * 255.f;
+				tile[(i * TILE_W + j) * 3 + c] = glm::clamp(color[c] * 255.f, 0.f, 255.f);
 			}
 		}
 	}
