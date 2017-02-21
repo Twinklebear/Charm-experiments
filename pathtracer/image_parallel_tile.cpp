@@ -40,16 +40,23 @@ void ImageParallelTile::render() {
 	const pt::Camera camera(scene->cam_pos, scene->cam_target, scene->cam_up, 65.0, IMAGE_W, IMAGE_H);
 
 	std::shared_ptr<pt::BxDF> lambertian = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
+	std::shared_ptr<pt::BxDF> lambertian_red = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
 	std::shared_ptr<pt::BxDF> reflective = std::make_shared<pt::SpecularReflection>(glm::vec3(1));
 	// Each tile is RGB8 color data
 	// TODO: Each tile should be RGBA8 + ZF32 for compositing primary rays.
 	// Maybe for transparency we'd want floating point alpha and color?
 	uint8_t *tile = new uint8_t[TILE_W * TILE_H * 3];
-	const pt::WhittedIntegrator integrator(pt::Scene({
-		std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, reflective),
-		std::make_shared<pt::Sphere>(glm::vec3(0.25, 0.7, 1.0), 0.25, lambertian),
-		std::make_shared<pt::Plane>(glm::vec3(0, -1, 0), glm::vec3(0, 1, 0), lambertian)
-	}));
+	const pt::WhittedIntegrator integrator(glm::vec3(0.05), pt::Scene({
+			std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, reflective),
+			std::make_shared<pt::Sphere>(glm::vec3(0.25, 0.7, 1.0), 0.25, lambertian),
+			std::make_shared<pt::Sphere>(glm::vec3(-1, -0.75, 1.2), 0.5, lambertian_red),
+			std::make_shared<pt::Plane>(glm::vec3(0, -1, 0), glm::vec3(0, 1, 0), lambertian)
+		},
+		{
+			std::make_shared<pt::PointLight>(glm::vec3(1, 2, 1.5), glm::vec3(1)),
+			std::make_shared<pt::PointLight>(glm::vec3(-0.5, 1.5, 1.5), glm::vec3(0.6))
+		}
+	));
 	for (uint64_t i = 0; i < TILE_H; ++i) {
 		for (uint64_t j = 0; j < TILE_W; ++j) {
 			const float px = j + start_x;

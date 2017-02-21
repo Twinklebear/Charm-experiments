@@ -8,13 +8,14 @@
 
 namespace pt {
 
+class Light;
 /* Describes the geometry in the scene being rendered
  */
-class Scene {
+struct Scene {
 	std::vector<std::shared_ptr<Geometry>> geometry;
+	std::vector<std::shared_ptr<Light>> lights;
 
-public:
-	Scene(std::vector<std::shared_ptr<Geometry>> geom);
+	Scene(std::vector<std::shared_ptr<Geometry>> geom, std::vector<std::shared_ptr<Light>> lights);
 	// Find the object hit by the ray in the scene
 	bool intersect(Ray &ray, DifferentialGeometry &dg) const;
 };

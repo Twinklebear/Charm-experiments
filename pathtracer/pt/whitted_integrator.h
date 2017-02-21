@@ -11,10 +11,11 @@ namespace pt {
  * recursive ray tracing.
  */
 class WhittedIntegrator {
+	glm::vec3 background;
 	Scene scene;
 
 public:
-	WhittedIntegrator(Scene scene);
+	WhittedIntegrator(const glm::vec3 &background, Scene scene);
 	glm::vec3 integrate(Ray &ray) const;
 };
 
