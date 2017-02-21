@@ -10,7 +10,7 @@ class Plane : public Geometry {
 	glm::vec3 center, normal;
 
 public:
-	Plane(const glm::vec3 &center, const glm::vec3 &normal);
+	Plane(const glm::vec3 &center, const glm::vec3 &normal, std::shared_ptr<BxDF> &brdf);
 	bool intersect(Ray &ray, DifferentialGeometry &dg) const override;
 };
 

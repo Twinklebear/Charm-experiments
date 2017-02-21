@@ -10,7 +10,7 @@ class Sphere : public Geometry {
 	float radius;
 
 public:
-	Sphere(const glm::vec3 &center, const float radius);
+	Sphere(const glm::vec3 &center, const float radius, std::shared_ptr<BxDF> &brdf);
 	bool intersect(Ray &ray, DifferentialGeometry &dg) const override;
 };
 

@@ -1,13 +1,19 @@
 #pragma once
 
+#include <memory>
 #include "ray.h"
+#include "brdf.h"
 #include "diff_geom.h"
 
 namespace pt {
 
 class Geometry {
+protected:
+	std::shared_ptr<BxDF> brdf;
+
 public:
-	virtual ~Geometry(){}
+	Geometry(std::shared_ptr<BxDF> &brdf);
+	virtual ~Geometry();
 	virtual bool intersect(Ray &ray, DifferentialGeometry &dg) const = 0;
 };
 

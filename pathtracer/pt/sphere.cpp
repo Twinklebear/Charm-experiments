@@ -4,7 +4,9 @@
 
 namespace pt {
 
-Sphere::Sphere(const glm::vec3 &center, const float radius) : center(center), radius(radius) {}
+Sphere::Sphere(const glm::vec3 &center, const float radius, std::shared_ptr<BxDF> &brdf)
+	: Geometry(brdf), center(center), radius(radius)
+{}
 bool Sphere::intersect(Ray &ray, DifferentialGeometry &dg) const {
 	const float a = glm::length2(ray.dir);
 	const glm::vec3 oc = ray.origin - center;
@@ -17,6 +19,7 @@ bool Sphere::intersect(Ray &ray, DifferentialGeometry &dg) const {
 			ray.t_max = t;
 			dg.point = ray.origin + ray.dir * t;
 			dg.normal = glm::normalize(dg.point - center);
+			dg.brdf = brdf.get();
 			// Compute the tangent and bitangent
 			// Note: b/c none of the materials depend on the tanget/bitangent
 			// orientation being consistent this should be fine, we just need some
@@ -29,6 +32,7 @@ bool Sphere::intersect(Ray &ray, DifferentialGeometry &dg) const {
 				ray.t_max = t;
 				dg.point = ray.origin + ray.dir * t;
 				dg.normal = glm::normalize(dg.point - center);
+				dg.brdf = brdf.get();
 				coordinate_system(dg.normal, dg.tangent, dg.bitangent);
 				return true;
 			}

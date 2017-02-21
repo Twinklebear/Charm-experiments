@@ -2,6 +2,8 @@
 
 namespace pt {
 
+Geometry::Geometry(std::shared_ptr<BxDF> &brdf) : brdf(brdf) {}
+Geometry::~Geometry(){}
 void coordinate_system(const glm::vec3 &e1, glm::vec3 &e2, glm::vec3 &e3) {
 	// Compute the tangent and bitangent
 	if (std::abs(e1.x) > std::abs(e1.y)) {
