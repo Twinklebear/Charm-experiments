@@ -30,5 +30,25 @@ glm::vec3 Lambertian::eval(const glm::vec3&, const glm::vec3&) const {
 	return reflectance * glm::one_over_pi<float>();
 }
 
+SpecularReflection::SpecularReflection(const glm::vec3 &reflectance) : reflectance(reflectance) {}
+int SpecularReflection::bxdf_type() const {
+	return BRDFType::Specular | BRDFType::Reflection;
+}
+glm::vec3 SpecularReflection::eval(const glm::vec3 &, const glm::vec3 &) const {
+	return glm::vec3(0);
+}
+BxDFSample SpecularReflection::sample(const glm::vec3 &w_o, const float*) const {
+	const glm::vec3 w_i(-w_o.x, -w_o.y, w_o.z);
+	if (w_i.z != 0.f) {
+		// TODO: Fresnel
+		const glm::vec3 color = reflectance / std::abs(BxDF::cos_theta(w_i));
+		return BxDFSample(color, w_i, 1.f);
+	}
+	return BxDFSample(glm::vec3(0), w_i, 0.f);
+}
+float SpecularReflection::pdf(const glm::vec3 &, const glm::vec3 &) const {
+	return 0.0;
+}
+
 }
 

@@ -6,7 +6,7 @@
 
 namespace pt {
 
-enum BRDFType { Diffuse, Specular, Reflection, Refraction };
+enum BRDFType { Diffuse, Specular, Reflection, Transmission };
 
 struct BxDFSample {
 	// Sampled BRDF value
@@ -83,6 +83,22 @@ public:
 	Lambertian(const glm::vec3 &reflectance);
 	int bxdf_type() const override;
 	glm::vec3 eval(const glm::vec3 &w_i, const glm::vec3 &w_o) const override;
+};
+
+class SpecularReflection : public BxDF {
+	glm::vec3 reflectance;
+
+public:
+	SpecularReflection(const glm::vec3 &reflectance);
+	int bxdf_type() const override;
+	// Note: this will always return black as the brdf is a delta function
+	glm::vec3 eval(const glm::vec3 &w_i, const glm::vec3 &w_o) const override;
+	// Compute and return the specularly reflected direction
+	BxDFSample sample(const glm::vec3 &w_o, const float *samples) const override;
+	/* Note that for specular reflection the pdf is always 0, besides for the
+	 * specular reflection dir returned by eval
+	 */
+	float pdf(const glm::vec3 &w_i, const glm::vec3 &w_o) const override;
 };
 
 }
