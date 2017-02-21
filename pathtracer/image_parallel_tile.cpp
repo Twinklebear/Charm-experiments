@@ -68,9 +68,9 @@ void ImageParallelTile::render() {
 		glm::vec3 color(0);
 		// TODO: Samples should be in multiple passes like in the aobench render
 		for (uint64_t sp = 0; sp < 32; ++sp) {
-			const float px = j + real_distrib(rng) + start_x;
-			const float py = i + real_distrib(rng) + start_y;
-			pt::Ray ray = camera.generate_ray(px, py, {0.5, 0.5});
+			const float px = j + start_x;
+			const float py = i + start_y;
+			pt::Ray ray = camera.generate_ray(px, py, {real_distrib(rng), real_distrib(rng)});
 			color += integrator.integrate(ray);
 		}
 		color = linear_to_srgb(color / 32.f);
