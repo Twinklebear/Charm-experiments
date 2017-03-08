@@ -49,7 +49,7 @@ void ImageParallelTile::render() {
 	// Maybe for transparency we'd want floating point alpha and color?
 	uint8_t *tile = new uint8_t[TILE_W * TILE_H * 3];
 	const pt::PathIntegrator integrator(glm::vec3(0.05), pt::Scene({
-			std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, reflective),
+			std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, lambertian_blue),
 			std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.7, 1.0), 0.25, lambertian_blue),
 			std::make_shared<pt::Sphere>(glm::vec3(-1, -0.75, 1.2), 0.5, lambertian_red),
 			// Walls
@@ -60,7 +60,7 @@ void ImageParallelTile::render() {
 			std::make_shared<pt::Plane>(glm::vec3(0, 0, -2), glm::vec3(0, 0, 1), lambertian_white)
 		},
 		{
-			std::make_shared<pt::PointLight>(glm::vec3(0, 1.5, 0), glm::vec3(0.9)),
+			std::make_shared<pt::PointLight>(glm::vec3(0, 1.5, 0.5), glm::vec3(0.9)),
 		}
 	));
 	std::mt19937 rng{std::random_device()()};

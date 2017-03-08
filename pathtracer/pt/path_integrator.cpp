@@ -1,3 +1,5 @@
+#include <iostream>
+#include <glm/ext.hpp>
 #include "path_integrator.h"
 #include "diff_geom.h"
 #include "light.h"
@@ -26,6 +28,7 @@ glm::vec3 PathIntegrator::integrate(Ray &start) const {
 				const glm::vec3 w_i = dg.to_shading(light_sample.dir);
 				if (glm::dot(light_sample.dir, dg.normal) > 0.0 && !light_sample.occluded(scene)) {
 					// note: no division by pdf since it's 1 for the delta light
+					// TODO: We should divide by the probability of picking the light we chose though
 					illum += path_throughput * dg.brdf->eval(w_i, w_o) * light_sample.illum
 						* std::abs(glm::dot(light_sample.dir, dg.normal));
 				}
@@ -41,7 +44,18 @@ glm::vec3 PathIntegrator::integrate(Ray &start) const {
 
 			ray = Ray(dg.point, dg.from_shading(f.w_i), 0.001);
 			ray.depth = i;
-			path_throughput = path_throughput * f.color * std::abs(glm::dot(ray.dir, dg.normal)) / f.pdf;
+			auto tmp = path_throughput * f.color * std::abs(glm::dot(ray.dir, dg.normal)) / f.pdf;
+#if 1
+			if (glm::length(tmp) > glm::length(path_throughput)) {
+				std::cout << "energy was added, prev = " << glm::to_string(path_throughput)
+					<< " new = " << glm::to_string(tmp)
+					<< " f.color = " << glm::to_string(f.color)
+					<< " f.w_i = " << glm::to_string(f.w_i)
+					<< " geom term = " << std::abs(glm::dot(ray.dir, dg.normal))
+					<< " pdf = " << f.pdf << "\n";
+			}
+#endif
+			path_throughput = tmp;
 		} else {
 			illum += path_throughput * background;
 			break;

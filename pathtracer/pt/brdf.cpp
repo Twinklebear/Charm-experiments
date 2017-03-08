@@ -17,7 +17,7 @@ BxDFSample BxDF::sample(const glm::vec3 &w_o, const float *samples) const {
 }
 float BxDF::pdf(const glm::vec3 &w_i, const glm::vec3 &w_o) const {
 	if (BxDF::same_hemisphere(w_i, w_o)) {
-		return std::abs(BxDF::cos_theta(w_i)) * glm::one_over_pi<float>();
+		return /*std::abs(BxDF::cos_theta(w_i)) */ glm::one_over_pi<float>();
 	}
 	return 0.0;
 }
