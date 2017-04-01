@@ -45,16 +45,6 @@ glm::vec3 PathIntegrator::integrate(Ray &start) const {
 			ray = Ray(dg.point, dg.from_shading(f.w_i), 0.001);
 			ray.depth = i;
 			auto tmp = path_throughput * f.color * std::abs(glm::dot(ray.dir, dg.normal)) / f.pdf;
-#if 1
-			if (glm::length(tmp) > glm::length(path_throughput)) {
-				std::cout << "energy was added, prev = " << glm::to_string(path_throughput)
-					<< " new = " << glm::to_string(tmp)
-					<< " f.color = " << glm::to_string(f.color)
-					<< " f.w_i = " << glm::to_string(f.w_i)
-					<< " geom term = " << std::abs(glm::dot(ray.dir, dg.normal))
-					<< " pdf = " << f.pdf << "\n";
-			}
-#endif
 			path_throughput = tmp;
 		} else {
 			illum += path_throughput * background;
