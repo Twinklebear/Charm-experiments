@@ -18,8 +18,9 @@ extern uint64_t IMAGE_H;
 extern uint64_t TILE_W;
 extern uint64_t TILE_H;
 
-/*
- * todo
+ImageParallelTile::ImageParallelTile() : rng(std::random_device()()) {}
+ImageParallelTile::ImageParallelTile(CkMigrateMessage *msg) : rng(std::random_device()()) {}
+void ImageParallelTile::pup(PUP::er &p) {
 	// Migrate the RNG state
 	if (p.isUnpacking()) {
 		std::string rng_str;
@@ -32,10 +33,7 @@ extern uint64_t TILE_H;
 		std::string rng_str = rng_state.str();
 		p | rng_str;
 	}
-*/
-
-ImageParallelTile::ImageParallelTile() {}
-ImageParallelTile::ImageParallelTile(CkMigrateMessage *msg) {}
+}
 void ImageParallelTile::render() {
 	const uint64_t tiles_x = IMAGE_W / TILE_W;
 	const uint64_t start_x = thisIndex.x * TILE_W;
@@ -46,8 +44,8 @@ void ImageParallelTile::render() {
 	std::shared_ptr<pt::BxDF> lambertian_white = std::make_shared<pt::Lambertian>(glm::vec3(0.8));
 	std::shared_ptr<pt::BxDF> lambertian_red = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
 	std::shared_ptr<pt::BxDF> reflective = std::make_shared<pt::SpecularReflection>(glm::vec3(0.8));
-	// TODO: Each tile should be RGBAZF32 for compositing primary rays.
-	// Maybe for transparency we'd want floating point alpha and color?
+
+	// TODO: Each tile should be also have Z for compositing primary rays.
 	float *tile = new float[TILE_W * TILE_H * 3];
 	const pt::PathIntegrator integrator(glm::vec3(0.05), pt::Scene({
 			std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, lambertian_blue),
@@ -64,9 +62,8 @@ void ImageParallelTile::render() {
 			std::make_shared<pt::PointLight>(glm::vec3(0, 1.5, 0.5), glm::vec3(0.9)),
 		}
 	));
-	std::mt19937 rng{std::random_device()()};
-	std::uniform_real_distribution<float> real_distrib;
 
+	std::uniform_real_distribution<float> real_distrib;
 	for (uint64_t i = 0; i < TILE_H; ++i) {
 		for (uint64_t j = 0; j < TILE_W; ++j) {
 			const float px = j + start_x;
