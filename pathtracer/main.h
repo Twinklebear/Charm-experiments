@@ -2,16 +2,23 @@
 
 #include <cstdint>
 #include <string>
+#include <chrono>
 #include <memory>
 #include "pt/pt.h"
+#include "image_parallel_tile.decl.h"
 
 class Main : public CBase_Main {
 	uint64_t num_tiles;
 	uint64_t done_count;
-	std::vector<uint8_t> image;
+	uint64_t spp;
+	uint64_t samples_taken;
+	// Timing stuff
+	std::chrono::high_resolution_clock::time_point start_pass, start_render;
+	std::vector<float> image;
 	// For each tile in the image we store all tiles sent for it
 	// by the different bricks. brick_tiles [ tile 0: [brick 0, brick 1], tile 1...]
 	std::vector<std::vector<std::vector<float>>> brick_tiles;
+	CProxy_ImageParallelTile img_tiles;
 
 public:
 	Main(CkArgMsg *msg);
@@ -19,7 +26,7 @@ public:
 
 	// Called by each image-parallel rendering or compositing Chare
 	// when they've finished computing the tile
-	void tile_done(const uint64_t x, const uint64_t y, const uint8_t *tile);
+	void tile_done(const uint64_t x, const uint64_t y, const float *tile);
 };
 
 class SceneMessage : public CMessage_SceneMessage {

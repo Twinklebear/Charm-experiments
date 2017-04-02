@@ -18,19 +18,21 @@ extern uint64_t IMAGE_H;
 extern uint64_t TILE_W;
 extern uint64_t TILE_H;
 
-glm::vec3 linear_to_srgb(const glm::vec3 &v) {
-	const float a = 0.055;
-	const float b = 1.f / 2.4f;
-	glm::vec3 srgb(0);
-	for (size_t i = 0; i < 3; ++i) {
-		if (v[i] <= 0.0031308) {
-			srgb[i] = 12.92 * v[i];
-		} else {
-			srgb[i] = (1.0 + a) * std::pow(v[i], b) - a;
-		}
+/*
+ * todo
+	// Migrate the RNG state
+	if (p.isUnpacking()) {
+		std::string rng_str;
+		p | rng_str;
+		std::stringstream rng_state(rng_str);
+		rng_state >> rng;
+	} else {
+		std::stringstream rng_state;
+		rng_state << rng;
+		std::string rng_str = rng_state.str();
+		p | rng_str;
 	}
-	return srgb;
-}
+*/
 
 ImageParallelTile::ImageParallelTile() {}
 ImageParallelTile::ImageParallelTile(CkMigrateMessage *msg) {}
@@ -44,10 +46,9 @@ void ImageParallelTile::render() {
 	std::shared_ptr<pt::BxDF> lambertian_white = std::make_shared<pt::Lambertian>(glm::vec3(0.8));
 	std::shared_ptr<pt::BxDF> lambertian_red = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
 	std::shared_ptr<pt::BxDF> reflective = std::make_shared<pt::SpecularReflection>(glm::vec3(0.8));
-	// Each tile is RGB8 color data
-	// TODO: Each tile should be RGBA8 + ZF32 for compositing primary rays.
+	// TODO: Each tile should be RGBAZF32 for compositing primary rays.
 	// Maybe for transparency we'd want floating point alpha and color?
-	uint8_t *tile = new uint8_t[TILE_W * TILE_H * 3];
+	float *tile = new float[TILE_W * TILE_H * 3];
 	const pt::PathIntegrator integrator(glm::vec3(0.05), pt::Scene({
 			std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, lambertian_blue),
 			std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.7, 1.0), 0.25, lambertian_blue),
@@ -68,18 +69,12 @@ void ImageParallelTile::render() {
 
 	for (uint64_t i = 0; i < TILE_H; ++i) {
 		for (uint64_t j = 0; j < TILE_W; ++j) {
-		glm::vec3 color(0);
-		const uint64_t spp = 32;
-		// TODO: Samples should be in multiple passes like in the aobench render
-		for (uint64_t sp = 0; sp < spp; ++sp) {
 			const float px = j + start_x;
 			const float py = i + start_y;
 			pt::Ray ray = camera.generate_ray(px, py, {real_distrib(rng), real_distrib(rng)});
-			color += integrator.integrate(ray);
-		}
-		color = linear_to_srgb(color / static_cast<float>(spp));
+			const glm::vec3 color = integrator.integrate(ray);
 			for (size_t c = 0; c < 3; ++c) {
-				tile[(i * TILE_W + j) * 3 + c] = glm::clamp(color[c] * 255.f, 0.f, 255.f);
+				tile[(i * TILE_W + j) * 3 + c] = color[c];
 			}
 		}
 	}

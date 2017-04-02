@@ -14,7 +14,7 @@ mainmodule main {
 		entry Main(CkArgMsg *msg);
 		// Called by each image-parallel rendering or compositing Chare
 		// when they've finished computing the tile
-		entry void tile_done(const uint64_t x, const uint64_t y, const uint8_t tile[TILE_W * TILE_H * 3]);
+		entry void tile_done(const uint64_t x, const uint64_t y, const float tile[TILE_W * TILE_H * 3]);
 	};
 
 	message SceneMessage;

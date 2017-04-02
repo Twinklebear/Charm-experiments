@@ -31,7 +31,17 @@ const static std::string USAGE =
 "\t--tile W H    set tile width and height. Default 16 16\n"
 "\t--img W H     set image dimensions in tiles. Default 100 100\n";
 
-Main::Main(CkArgMsg *msg) : done_count(0) {
+float linear_to_srgb(const float x) {
+	const float a = 0.055;
+	const float b = 1.f / 2.4f;
+	if (x <= 0.0031308) {
+		return 12.92 * x;
+	} else {
+		return (1.0 + a) * std::pow(x, b) - a;
+	}
+}
+
+Main::Main(CkArgMsg *msg) : done_count(0), spp(1), samples_taken(0) {
 	// Set some default image dimensions
 	TILE_W = 32;
 	TILE_H = 32;
@@ -64,6 +74,8 @@ Main::Main(CkArgMsg *msg) : done_count(0) {
 				cam_up.x = std::atof(msg->argv[++i]);
 				cam_up.y = std::atof(msg->argv[++i]);
 				cam_up.z = std::atof(msg->argv[++i]);
+			} else if (std::strcmp("--spp", msg->argv[i]) == 0) {
+				spp = std::atoi(msg->argv[++i]);
 			}
 		}
 	}
@@ -77,23 +89,48 @@ Main::Main(CkArgMsg *msg) : done_count(0) {
 	CkPrintf("Rendering %dx%d image with %dx%d tile size\n", IMAGE_W, IMAGE_H, TILE_W, TILE_H);
 
 	CkPrintf("Rendering image-parallel\n");
-	CProxy_ImageParallelTile img_tiles = CProxy_ImageParallelTile::ckNew(tiles_x, tiles_y);
+	img_tiles = CProxy_ImageParallelTile::ckNew(tiles_x, tiles_y);
+	start_pass = start_render = std::chrono::high_resolution_clock::now();
 	img_tiles.render();
 }
 Main::Main(CkMigrateMessage *msg) {}
-void Main::tile_done(const uint64_t x, const uint64_t y, const uint8_t *tile) {
+void Main::tile_done(const uint64_t x, const uint64_t y, const float *tile) {
 	// Write this tiles data into the image
 	for (uint64_t i = 0; i < TILE_H; ++i) {
 		for (uint64_t j = 0; j < TILE_W; ++j) {
 			for (uint64_t c = 0; c < 3; ++c) {
-				image[((i + y) * IMAGE_W + j + x) * 3 + c] = tile[(i * TILE_W + j) * 3 + c];
+				image[((i + y) * IMAGE_W + j + x) * 3 + c] += tile[(i * TILE_W + j) * 3 + c];
 			}
 		}
 	}
 	++done_count;
 	if (done_count == num_tiles) {
-		stbi_write_png("pathtracer_render.png", IMAGE_W, IMAGE_H, 3, image.data(), IMAGE_W * 3);
-		CkExit();
+		++samples_taken;
+		done_count = 0;
+
+		using namespace std::chrono;
+		auto end = high_resolution_clock::now();
+		auto duration = duration_cast<milliseconds>(end - start_pass);
+		CkPrintf("Iteration took %dms\n", duration.count());
+		if (samples_taken == spp) {
+			duration = duration_cast<milliseconds>(end - start_render);
+			CkPrintf("Rendering took %dms\n", duration.count());
+
+			std::vector<uint8_t> image_out(IMAGE_W * IMAGE_H * 3, 0);
+			for (uint64_t i = 0; i < IMAGE_H; ++i) {
+				for (uint64_t j = 0; j < IMAGE_W; ++j) {
+					for (uint32_t c = 0; c < 3; ++c) {
+						const float x = linear_to_srgb(image[(i * IMAGE_W + j) * 3 + c] / spp) * 255.0;
+						image_out[(i * IMAGE_W + j) * 3 + c] = glm::clamp(x, 0.f, 255.f);
+					}
+				}
+			}
+			stbi_write_png("pathtracer_render.png", IMAGE_W, IMAGE_H, 3, image_out.data(), IMAGE_W * 3);
+			CkExit();
+		} else {
+			start_pass = high_resolution_clock::now();
+			img_tiles.render();
+		}
 	}
 }
 
