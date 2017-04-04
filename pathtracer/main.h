@@ -37,7 +37,7 @@ public:
 
 	SceneMessage(const glm::vec3 &cam_pos, const glm::vec3 &cam_target, const glm::vec3 &cam_up);
 	void msg_pup(PUP::er &p);
-	// Note: note needed for simple fixed-size msg, but keeping it around
+	// Note: not needed for simple fixed-size msg, but keeping it around
 	// for reference.
 	//static void* pack(SceneMessage *msg);
 	//static SceneMessage* unpack(void*);
