@@ -19,7 +19,7 @@ mainmodule main {
 		// when they've finished computing the tile
 		entry void tile_done(const uint64_t x, const uint64_t y, const float tile[TILE_W * TILE_H * 3]);
 		// Called when all the regions are done, for debugging now
-		entry void dbg_region_done();
+		entry void region_loaded();
 	};
 
 	message SceneMessage;

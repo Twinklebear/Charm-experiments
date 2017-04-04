@@ -142,15 +142,14 @@ void Main::tile_done(const uint64_t x, const uint64_t y, const float *tile) {
 		}
 	}
 }
-void Main::dbg_region_done() {
+void Main::region_loaded() {
 	++done_count;
 	if (done_count == NUM_REGIONS) {
-		CkPrintf("All regions done\n");
+		CkPrintf("All regions loaded\n");
 		CkExit();
 	}
 }
 
-SceneMessage::SceneMessage() {}
 SceneMessage::SceneMessage(const glm::vec3 &cam_pos, const glm::vec3 &cam_target, const glm::vec3 &cam_up)
 	: cam_pos(cam_pos), cam_target(cam_target), cam_up(cam_up)
 {}

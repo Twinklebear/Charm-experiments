@@ -27,12 +27,10 @@ public:
 	// Called by each image-parallel rendering or compositing Chare
 	// when they've finished computing the tile
 	void tile_done(const uint64_t x, const uint64_t y, const float *tile);
-	void dbg_region_done();
+	void region_loaded();
 };
 
 class SceneMessage : public CMessage_SceneMessage {
-	SceneMessage();
-
 public:
 	// Info about the camera in the scene
 	glm::vec3 cam_pos, cam_target, cam_up;

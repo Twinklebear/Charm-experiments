@@ -51,7 +51,7 @@ void Region::send_bounds(BoundsMessage *msg) {
 	delete msg;
 	++bounds_received;
 	if (bounds_received == NUM_REGIONS - 1) {
-		main_proxy.dbg_region_done();
+		main_proxy.region_loaded();
 	}
 }
 
