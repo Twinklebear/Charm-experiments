@@ -1,0 +1,20 @@
+module data_parallel {
+	// Message sent between regions to send their sizes around
+	message BoundsMessage;
+
+	// A Region is a AABB in the world containing some of the
+	// distributed scene data.
+	array[1D] Region {
+		entry Region();
+		// TODO: Eventually this would load some large
+		// mesh file in some distributed fashion
+		entry void load();
+		// Receive another region's bounds
+		entry void send_bounds(BoundsMessage *msg);
+		// TODO: render: compute and send primary rays for any
+		// pixels where this Region is the closest box
+		// TODO: send_ray: send a ray for traversal through
+		// this region's data.
+	};
+}
+

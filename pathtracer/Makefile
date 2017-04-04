@@ -2,7 +2,7 @@ CHARMDIR?=~/libs/charm/multicore-linux64
 GLM_DIR?=/usr/include/
 CHARMC=$(CHARMDIR)/bin/charmc -cc $(CC) -c++ $(CXX) $(OPTS)
 
-CHARM_SRCS=main.cpp image_parallel_tile.cpp
+CHARM_SRCS=main.cpp image_parallel_tile.cpp data_parallel.cpp
 CHARM_OBJS=$(CHARM_SRCS:.cpp=.o)
 CHARM_DECLS=$(CHARM_SRCS:.cpp=.decl.h)
 

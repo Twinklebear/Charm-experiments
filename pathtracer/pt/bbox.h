@@ -1,6 +1,9 @@
 #pragma once
 
+#include <iostream>
+#include <limits>
 #include <glm/glm.hpp>
+#include <glm/ext.hpp>
 #include "ray.h"
 
 namespace pt {
@@ -8,7 +11,10 @@ namespace pt {
 struct BBox {
 	glm::vec3 min, max;
 
-	inline BBox(const glm::vec3 &min, const glm::vec3 &max) : min(min), max(max) {}
+	inline BBox(const glm::vec3 &min = glm::vec3(std::numeric_limits<float>::infinity()),
+			const glm::vec3 &max = -glm::vec3(std::numeric_limits<float>::infinity()))
+		: min(min), max(max)
+	{}
 	inline const glm::vec3& operator[](const size_t i) const {
 		return i == 0 ? min : max;
 	}
@@ -58,5 +64,11 @@ struct BBox {
 	}
 };
 
+}
+
+inline std::ostream& operator<<(std::ostream &os, const pt::BBox &b) {
+	os << "BBox { " << glm::to_string(b.min)
+		<< ", " << glm::to_string(b.max) << "\n";
+	return os;
 }
 

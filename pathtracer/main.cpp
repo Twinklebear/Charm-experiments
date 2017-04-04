@@ -13,6 +13,7 @@
 #include "pt/pt.h"
 #include "main.decl.h"
 #include "image_parallel_tile.decl.h"
+#include "data_parallel.decl.h"
 #include "main.h"
 #include "pup_operators.h"
 
@@ -25,6 +26,7 @@ uint64_t IMAGE_H;
 // Tile x/y dimensions
 uint64_t TILE_W;
 uint64_t TILE_H;
+uint64_t NUM_REGIONS;
 
 const static std::string USAGE =
 "Arguments:\n"
@@ -88,10 +90,17 @@ Main::Main(CkArgMsg *msg) : done_count(0), spp(1), samples_taken(0) {
 	scene = new SceneMessage(cam_pos, cam_target, cam_up);
 	CkPrintf("Rendering %dx%d image with %dx%d tile size\n", IMAGE_W, IMAGE_H, TILE_W, TILE_H);
 
-	CkPrintf("Rendering image-parallel\n");
-	img_tiles = CProxy_ImageParallelTile::ckNew(tiles_x, tiles_y);
-	start_pass = start_render = std::chrono::high_resolution_clock::now();
-	img_tiles.render();
+	if (false) {
+		CkPrintf("Rendering image-parallel\n");
+		img_tiles = CProxy_ImageParallelTile::ckNew(tiles_x, tiles_y);
+		start_pass = start_render = std::chrono::high_resolution_clock::now();
+		img_tiles.render();
+	} else {
+		NUM_REGIONS = 3;
+		CkPrintf("Experimental data parallel testing code with %lu regions\n", NUM_REGIONS);
+		CProxy_Region regions = CProxy_Region::ckNew(NUM_REGIONS);
+		regions.load();
+	}
 }
 Main::Main(CkMigrateMessage *msg) {}
 void Main::tile_done(const uint64_t x, const uint64_t y, const float *tile) {
@@ -133,6 +142,13 @@ void Main::tile_done(const uint64_t x, const uint64_t y, const float *tile) {
 		}
 	}
 }
+void Main::dbg_region_done() {
+	++done_count;
+	if (done_count == NUM_REGIONS) {
+		CkPrintf("All regions done\n");
+		CkExit();
+	}
+}
 
 SceneMessage::SceneMessage() {}
 SceneMessage::SceneMessage(const glm::vec3 &cam_pos, const glm::vec3 &cam_target, const glm::vec3 &cam_up)
@@ -143,6 +159,9 @@ void SceneMessage::msg_pup(PUP::er &p) {
 	p | cam_target;
 	p | cam_up;
 }
+
+/* Note: this isn't needed for a simple fixed-size message but
+ * I'm keeping the code around for reference
 void* SceneMessage::pack(SceneMessage *msg) {
 	PUP::sizer sizer;
 	msg->msg_pup(sizer);
@@ -162,6 +181,7 @@ SceneMessage* SceneMessage::unpack(void *buf) {
 	CkFreeMsg(buf);
 	return msg;
 }
+*/
 
 #include "main.def.h"
 

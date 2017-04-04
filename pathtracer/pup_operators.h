@@ -10,4 +10,9 @@ inline void operator|(PUP::er &p, glm::tvec3<T, (glm::precision)0> &v) {
 	p | v.y;
 	p | v.z;
 }
+inline void operator|(PUP::er &p, pt::BBox &bounds) {
+	p | bounds.min;
+	p | bounds.max;
+}
+
 

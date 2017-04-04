@@ -7,14 +7,19 @@ mainmodule main {
 	// Tile x/y dimensions
 	readonly uint64_t TILE_W;
 	readonly uint64_t TILE_H;
+	// Number of regions in data parallel rendering
+	readonly uint64_t NUM_REGIONS;
 
 	extern module image_parallel_tile;
+	extern module data_parallel;
 
 	mainchare Main {
 		entry Main(CkArgMsg *msg);
 		// Called by each image-parallel rendering or compositing Chare
 		// when they've finished computing the tile
 		entry void tile_done(const uint64_t x, const uint64_t y, const float tile[TILE_W * TILE_H * 3]);
+		// Called when all the regions are done, for debugging now
+		entry void dbg_region_done();
 	};
 
 	message SceneMessage;

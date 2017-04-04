@@ -27,6 +27,7 @@ public:
 	// Called by each image-parallel rendering or compositing Chare
 	// when they've finished computing the tile
 	void tile_done(const uint64_t x, const uint64_t y, const float *tile);
+	void dbg_region_done();
 };
 
 class SceneMessage : public CMessage_SceneMessage {
@@ -38,7 +39,9 @@ public:
 
 	SceneMessage(const glm::vec3 &cam_pos, const glm::vec3 &cam_target, const glm::vec3 &cam_up);
 	void msg_pup(PUP::er &p);
-	static void* pack(SceneMessage *msg);
-	static SceneMessage* unpack(void*);
+	// Note: note needed for simple fixed-size msg, but keeping it around
+	// for reference.
+	//static void* pack(SceneMessage *msg);
+	//static SceneMessage* unpack(void*);
 };
 
