@@ -40,6 +40,9 @@ bool Sphere::intersect(Ray &ray, DifferentialGeometry &dg) const {
 	}
 	return false;
 }
+BBox Sphere::bounds() const {
+	return BBox(center - glm::vec3(radius), center + glm::vec3(radius));
+}
 
 }
 

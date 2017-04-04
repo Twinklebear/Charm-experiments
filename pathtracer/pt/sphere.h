@@ -12,6 +12,7 @@ class Sphere : public Geometry {
 public:
 	Sphere(const glm::vec3 &center, const float radius, std::shared_ptr<BxDF> &brdf);
 	bool intersect(Ray &ray, DifferentialGeometry &dg) const override;
+	BBox bounds() const override;
 };
 
 }

@@ -2,6 +2,7 @@
 
 #include <memory>
 #include "ray.h"
+#include "bbox.h"
 #include "brdf.h"
 #include "diff_geom.h"
 
@@ -15,6 +16,7 @@ public:
 	Geometry(std::shared_ptr<BxDF> &brdf);
 	virtual ~Geometry();
 	virtual bool intersect(Ray &ray, DifferentialGeometry &dg) const = 0;
+	virtual BBox bounds() const = 0;
 };
 
 // Compute an orthonormal coordinate system with e1 as one of the axes
