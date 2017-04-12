@@ -10,7 +10,7 @@ all: pathtracer.out
 
 pathtracer.out: $(CHARM_OBJS) pt/libpt.a
 	$(CHARMC) -optimize -module CommonLBs -balance workstealing -language charm++ \
-		-c++-option -std=c++11 -c++-option -DGLM_FORCE_RADIANS $^ -o $@ -Lpt/ -lpt
+		-c++-option -std=c++14 -c++-option -DGLM_FORCE_RADIANS $^ -o $@ -Lpt/ -lpt
 
 pt/libpt.a: $(wildcard pt/*.cpp pt/*.h)
 	$(MAKE) -C pt all
