@@ -17,9 +17,8 @@ pt/libpt.a: $(wildcard pt/*.cpp pt/*.h)
 
 # The Charm++ generated code seems to produce a lot of warnings at this high a warning level,
 # makes it kind of hard to find warnings about my code.
-#$(CHARMC) -c++-option -std=c++11 -c++-option -Wall -c++-option -Wextra -c++-option -pedantic $< -o $@
 %.o: %.cpp %.h %.def.h $(CHARM_DECLS)
-	$(CHARMC) -balance workstealing -optimize -c++-option -std=c++11 \
+	$(CHARMC) -balance workstealing -optimize -c++-option -std=c++14 \
 		-c++-option -DGLM_FORCE_RADIANS -c++-option -I$(GLM_DIR) $< -o $@
 
 %.decl.h %.def.h: %.ci
