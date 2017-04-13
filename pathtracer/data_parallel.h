@@ -2,6 +2,7 @@
 
 #include <random>
 #include <vector>
+#include <memory>
 #include "pt/pt.h"
 
 class BoundsMessage;
@@ -13,6 +14,10 @@ class BoundsMessage;
 class Region : public CBase_Region {
 	// Other regions in the world, along with their bounds
 	CProxySection_Region others;
+	// TODO: We need to serialize or save/reload the object if
+	// the chare migrates
+	std::shared_ptr<pt::Sphere> my_object;
+	// TODO: We need to serialize this if the chare migrates
 	std::vector<pt::BBox> other_bounds;
 	uint64_t bounds_received;
 
@@ -30,6 +35,10 @@ public:
 	// Render the region tiles which this region projects to,
 	// compute and send primary rays for any pixels where this Region is the closest box
 	void render();
+
+private:
+	// Render a tile of the image to the tile passed
+	void render_tile(std::vector<float> &tile, const uint64_t start_x, const uint64_t start_y);
 };
 
 class BoundsMessage : public CMessage_BoundsMessage {

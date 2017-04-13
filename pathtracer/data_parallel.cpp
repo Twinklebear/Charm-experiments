@@ -17,12 +17,7 @@ extern uint64_t TILE_W;
 extern uint64_t TILE_H;
 extern uint64_t NUM_REGIONS;
 
-Region::Region() : rng(std::random_device()()), bounds_received(0) {}
-Region::Region(CkMigrateMessage *msg) : rng(std::random_device()()), bounds_received(0) {
-	delete msg;
-}
-void Region::load() {
-	std::shared_ptr<pt::Sphere> my_object = nullptr;
+Region::Region() : rng(std::random_device()()), bounds_received(0) {
 	if (thisIndex == 0) {
 		std::shared_ptr<pt::BxDF> lambertian_blue = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
 		my_object = std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, lambertian_blue);
@@ -33,7 +28,12 @@ void Region::load() {
 		std::shared_ptr<pt::BxDF> lambertian_red = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
 		my_object = std::make_shared<pt::Sphere>(glm::vec3(-1, -0.75, 1.2), 0.5, lambertian_red);
 	}
-
+}
+Region::Region(CkMigrateMessage *msg) : rng(std::random_device()()), bounds_received(0) {
+	CkPrintf("Region doesn't support migration!\n");
+	delete msg;
+}
+void Region::load() {
 	if (NUM_REGIONS == 1) {
 		main_proxy.region_loaded();
 	} else {
@@ -62,8 +62,8 @@ void Region::send_bounds(BoundsMessage *msg) {
 	}
 }
 void Region::render() {
-	const pt::Camera camera(scene->cam_pos, scene->cam_target, scene->cam_up, 65.0, IMAGE_W, IMAGE_H);
-
+	// TODO: Segfaults a lot on my laptop Ubuntu version, why? I don't
+	// see these crashes on sci linux desktop
 	const uint64_t tiles_x = IMAGE_W / TILE_W;
 	const uint64_t tiles_y = IMAGE_H / TILE_H;
 	for (uint64_t ty = 0; ty < tiles_y; ++ty) {
@@ -76,9 +76,42 @@ void Region::render() {
 			const uint64_t tid = ty * tiles_x + tx;
 			if (tid % NUM_REGIONS == thisIndex) {
 				TileCompleteMessage *msg = new TileCompleteMessage(tx, ty, 1);
-				std::fill(msg->tile.begin(), msg->tile.end(), static_cast<float>(thisIndex) / NUM_REGIONS);
+				//std::fill(msg->tile.begin(), msg->tile.end(), static_cast<float>(thisIndex) / NUM_REGIONS);
+				render_tile(msg->tile, tx * TILE_W, ty * TILE_H);
 				main_proxy.tile_done(msg);
 			}
+		}
+	}
+}
+void Region::render_tile(std::vector<float> &tile, const uint64_t start_x, const uint64_t start_y) {
+	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
+	// or at least keep the scene alive, since the Region may have multiple geometry
+	const pt::Camera camera(scene->cam_pos, scene->cam_target, scene->cam_up, 65.0, IMAGE_W, IMAGE_H);
+	pt::HitIntegrator integrator(pt::Scene({my_object}, {}));
+
+	std::uniform_real_distribution<float> real_distrib;
+	for (uint64_t i = 0; i < TILE_H; ++i) {
+		for (uint64_t j = 0; j < TILE_W; ++j) {
+			const float px = j + start_x;
+			const float py = i + start_y;
+			pt::Ray ray = camera.generate_ray(px, py, {real_distrib(rng), real_distrib(rng)});
+			glm::vec3 color = integrator.integrate(ray);
+			if (color == glm::vec3(0)) {
+				color = glm::vec3(0.1);
+			}
+			// Tag the tiles based on who owns them
+			switch (thisIndex) {
+				case 0: color *= glm::vec3(1, 0, 0); break;
+				case 1: color *= glm::vec3(0, 1, 0); break;
+				case 2: color *= glm::vec3(0, 0, 1); break;
+				default: break;
+			}
+
+			const size_t tx = (i * TILE_W + j) * 4;
+			for (size_t c = 0; c < 3; ++c) {
+				tile[tx + c] = color[c];
+			}
+			tile[tx + 3] = ray.t_max;
 		}
 	}
 }
