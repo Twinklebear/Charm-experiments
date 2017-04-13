@@ -18,6 +18,8 @@ mainmodule main {
 		// Called by each image-parallel rendering or compositing Chare
 		// when they've finished computing the tile
 		entry void tile_done(const uint64_t x, const uint64_t y, const float tile[TILE_W * TILE_H * 3]);
+		// Called by a Region when it's finished rendering a tile
+		entry void tile_done(TileCompleteMessage *msg);
 		// Called when all the regions are done, for debugging now
 		entry void region_loaded();
 	};

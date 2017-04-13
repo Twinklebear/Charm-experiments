@@ -1,6 +1,8 @@
 module data_parallel {
 	// Message sent between regions to send their sizes around
 	message BoundsMessage;
+	// Message sent to master when a distributed tile is completed
+	message TileCompleteMessage;
 
 	// A Region is a AABB in the world containing some of the
 	// distributed scene data.
@@ -11,8 +13,9 @@ module data_parallel {
 		entry void load();
 		// Receive another region's bounds
 		entry void send_bounds(BoundsMessage *msg);
-		// TODO: render: compute and send primary rays for any
-		// pixels where this Region is the closest box
+		// Render the region tiles which this region projects to,
+		// compute and send primary rays for any pixels where this Region is the closest box
+		entry void render();
 		// TODO: send_ray: send a ray for traversal through
 		// this region's data.
 	};
