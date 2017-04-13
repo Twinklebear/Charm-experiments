@@ -18,7 +18,9 @@ extern uint64_t TILE_H;
 extern uint64_t NUM_REGIONS;
 
 Region::Region() : rng(std::random_device()()), bounds_received(0) {}
-Region::Region(CkMigrateMessage *msg) : rng(std::random_device()()), bounds_received(0) {}
+Region::Region(CkMigrateMessage *msg) : rng(std::random_device()()), bounds_received(0) {
+	delete msg;
+}
 void Region::load() {
 	std::shared_ptr<pt::Sphere> my_object = nullptr;
 	if (thisIndex == 0) {
@@ -43,6 +45,7 @@ void Region::load() {
 				elems.push_back(CkArrayIndex1D(i));
 			}
 		}
+
 		others = CProxySection_Region::ckNew(thisArrayID, elems.getVec(), elems.size());
 		other_bounds.resize(NUM_REGIONS);
 		BoundsMessage *msg = new BoundsMessage(thisIndex, my_object->bounds());
@@ -50,7 +53,6 @@ void Region::load() {
 	}
 }
 void Region::send_bounds(BoundsMessage *msg) {
-	std::cout << "Got bounds from " << msg->id << " " << msg->bounds << "\n";
 	other_bounds[msg->id] = msg->bounds;
 
 	delete msg;
@@ -70,7 +72,7 @@ void Region::render() {
 			// tiles the master should expect. TODO: The tile owner should be
 			// the one with the first hit box for the tile, resolved based on Chare
 			// index in case of a tie. Also, if no box projects to the tile the
-			// owner is determined via this modulo 
+			// owner is determined via this modulo
 			const uint64_t tid = ty * tiles_x + tx;
 			if (tid % NUM_REGIONS == thisIndex) {
 				TileCompleteMessage *msg = new TileCompleteMessage(tx, ty, 1);

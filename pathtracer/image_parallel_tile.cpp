@@ -19,7 +19,9 @@ extern uint64_t TILE_W;
 extern uint64_t TILE_H;
 
 ImageParallelTile::ImageParallelTile() : rng(std::random_device()()) {}
-ImageParallelTile::ImageParallelTile(CkMigrateMessage *msg) : rng(std::random_device()()) {}
+ImageParallelTile::ImageParallelTile(CkMigrateMessage *msg) : rng(std::random_device()()) {
+	delete msg;
+}
 void ImageParallelTile::pup(PUP::er &p) {
 	// Migrate the RNG state
 	if (p.isUnpacking()) {

@@ -84,6 +84,7 @@ Main::Main(CkArgMsg *msg) : done_count(0), spp(1), samples_taken(0) {
 			}
 		}
 	}
+	delete msg;
 
 	IMAGE_W = TILE_W * tiles_x;
 	IMAGE_H = TILE_H * tiles_y;
@@ -107,7 +108,9 @@ Main::Main(CkArgMsg *msg) : done_count(0), spp(1), samples_taken(0) {
 		regions.load();
 	}
 }
-Main::Main(CkMigrateMessage *msg) {}
+Main::Main(CkMigrateMessage *msg) {
+	delete msg;
+}
 void Main::tile_done(const uint64_t x, const uint64_t y, const float *tile) {
 	// Write this tiles data into the image
 	for (uint64_t i = 0; i < TILE_H; ++i) {
