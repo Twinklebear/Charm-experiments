@@ -62,8 +62,6 @@ void Region::send_bounds(BoundsMessage *msg) {
 	}
 }
 void Region::render() {
-	// TODO: Segfaults a lot on my laptop Ubuntu version, why? I don't
-	// see these crashes on sci linux desktop
 	const uint64_t tiles_x = IMAGE_W / TILE_W;
 	const uint64_t tiles_y = IMAGE_H / TILE_H;
 	for (uint64_t ty = 0; ty < tiles_y; ++ty) {
