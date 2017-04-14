@@ -28,6 +28,7 @@ Region::Region() : rng(std::random_device()()), bounds_received(0) {
 		std::shared_ptr<pt::BxDF> lambertian_red = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
 		my_object = std::make_shared<pt::Sphere>(glm::vec3(-1, -0.75, 1.2), 0.5, lambertian_red);
 	}
+	other_bounds.resize(NUM_REGIONS);
 }
 Region::Region(CkMigrateMessage *msg) : rng(std::random_device()()), bounds_received(0) {
 	CkPrintf("Region doesn't support migration!\n");
@@ -47,7 +48,6 @@ void Region::load() {
 		}
 
 		others = CProxySection_Region::ckNew(thisArrayID, elems.getVec(), elems.size());
-		other_bounds.resize(NUM_REGIONS);
 		BoundsMessage *msg = new BoundsMessage(thisIndex, my_object->bounds());
 		others.send_bounds(msg);
 	}
