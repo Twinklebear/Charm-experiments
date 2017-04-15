@@ -90,6 +90,10 @@ void Region::render_tile(std::vector<float> &tile, const uint64_t start_x, const
 	const pt::Camera camera(scene->cam_pos, scene->cam_target, scene->cam_up, 65.0, IMAGE_W, IMAGE_H);
 	pt::HitIntegrator integrator(pt::Scene({my_object}, {}));
 
+	// TODO: Use the project_ray function to compute the screen-space AABB of this
+	// region's bounds. Then check which tiles it overlaps with when determining
+	// if we need to render a specific tile for this region.
+
 	std::uniform_real_distribution<float> real_distrib;
 	for (uint64_t i = 0; i < TILE_H; ++i) {
 		for (uint64_t j = 0; j < TILE_W; ++j) {
