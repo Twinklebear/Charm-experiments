@@ -77,7 +77,7 @@ void Region::render() {
 			// which node without requiring everyone to do the test on all
 			// the regions anyway to find out who potentially touches the tile?
 			//if (touches_tile(tx * TILE_W, ty * TILE_H)) {
-				TileCompleteMessage *msg = new TileCompleteMessage(tx, ty, 3);
+				TileCompleteMessage *msg = new TileCompleteMessage(tx, ty, NUM_REGIONS);
 				render_tile(msg->tile, tx * TILE_W, ty * TILE_H);
 				main_proxy.tile_done(msg);
 			//}
