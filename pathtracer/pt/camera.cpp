@@ -22,7 +22,6 @@ Ray Camera::generate_ray(const float x, const float y, const std::array<float, 2
 	const glm::vec3 u_step = ((x + samples[0]) / width) * screen_du;
 	const glm::vec3 v_step = ((y + samples[1]) / height) * screen_dv;
 	const glm::vec3 dir = glm::normalize(dir_top_left + u_step + v_step);
-	const glm::vec2 test = project_ray(dir);
 	return Ray(pos, dir);
 }
 glm::vec2 Camera::project_ray(const glm::vec3 &r) const {
@@ -37,7 +36,8 @@ glm::vec2 Camera::project_ray(const glm::vec3 &r) const {
 	const float t = -(glm::dot(pos, dir) + d) / v;
 	const glm::vec3 pt = pos + r * t;
 	const glm::vec3 screen_diff = pt - pos - dir_top_left;
-	return (glm::vec2(glm::dot(screen_diff, dx), glm::dot(screen_diff, dy)) / img_dims) * glm::vec2(width, height);
+	return (glm::vec2(glm::dot(screen_diff, dx), glm::dot(screen_diff, dy)) / img_dims)
+		* glm::vec2(width, height);
 }
 
 }
