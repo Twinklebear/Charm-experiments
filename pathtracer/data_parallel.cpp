@@ -72,12 +72,15 @@ void Region::render() {
 			// index in case of a tie. Also, if no box projects to the tile the
 			// owner is determined via this modulo
 			const uint64_t tid = ty * tiles_x + tx;
-			if (tid % NUM_REGIONS == thisIndex) {
-				TileCompleteMessage *msg = new TileCompleteMessage(tx, ty, 1);
-				//std::fill(msg->tile.begin(), msg->tile.end(), static_cast<float>(thisIndex) / NUM_REGIONS);
+			// TODO: Only render tiles out data touches, one node is responsible
+			// for telling how many tiles to expect in total? But how to decide
+			// which node without requiring everyone to do the test on all
+			// the regions anyway to find out who potentially touches the tile?
+			//if (touches_tile(tx * TILE_W, ty * TILE_H)) {
+				TileCompleteMessage *msg = new TileCompleteMessage(tx, ty, 3);
 				render_tile(msg->tile, tx * TILE_W, ty * TILE_H);
 				main_proxy.tile_done(msg);
-			}
+			//}
 		}
 	}
 }
@@ -110,6 +113,28 @@ void Region::render_tile(std::vector<float> &tile, const uint64_t start_x, const
 				tile[tx + c] = color[c];
 			}
 			tile[tx + 3] = ray.t_max;
+		}
+	}
+}
+bool Region::touches_tile(const uint64_t start_x, const uint64_t start_y) const {
+	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
+	// or at least keep the scene alive, since the Region may have multiple geometry
+	const pt::Camera camera(scene->cam_pos, scene->cam_target, scene->cam_up, 65.0, IMAGE_W, IMAGE_H);
+	// TODO: Do this test by projecting the box to the image and see if the AABB of the region's
+	// bounding box and seeing which tiles it touches.
+	const pt::BBox bounds = my_object->bounds();
+	const std::array<float, 2> sample_offset = {0.5, 0.5};
+	for (uint64_t i = 0; i < TILE_H; ++i) {
+		for (uint64_t j = 0; j < TILE_W; ++j) {
+			const float px = j + start_x;
+			const float py = i + start_y;
+			const pt::Ray ray = camera.generate_ray(px, py, sample_offset);
+			const glm::vec3 inv_dir = 1.f / ray.dir;
+			const std::array<int, 3> neg_dir = {ray.dir.x < 0 ? 1 : 0,
+				ray.dir.y < 0 ? 1 : 0, ray.dir.z < 0 ? 1 : 0};
+			if (bounds.intersect(ray, inv_dir, neg_dir)) {
+				return true;
+			}
 		}
 	}
 }

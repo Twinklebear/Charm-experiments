@@ -1,4 +1,6 @@
 #include <cmath>
+#include <iostream>
+#include <glm/ext.hpp>
 #include "camera.h"
 
 namespace pt {
@@ -17,10 +19,9 @@ Camera::Camera(const glm::vec3 &pos, const glm::vec3 &target, const glm::vec3 &_
 	dir_top_left = dir - 0.5f * screen_du - 0.5f * screen_dv;
 }
 Ray Camera::generate_ray(const float x, const float y, const std::array<float, 2> &samples) const {
-	glm::vec3 dir = dir_top_left;
 	const glm::vec3 u_step = ((x + samples[0]) / width) * screen_du;
 	const glm::vec3 v_step = ((y + samples[1]) / height) * screen_dv;
-	dir = glm::normalize(dir + u_step + v_step);
+	const glm::vec3 dir = glm::normalize(dir_top_left + u_step + v_step);
 	return Ray(pos, dir);
 }
 
