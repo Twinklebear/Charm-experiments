@@ -39,6 +39,9 @@ glm::vec2 Camera::project_ray(const glm::vec3 &r) const {
 	return (glm::vec2(glm::dot(screen_diff, dx), glm::dot(screen_diff, dy)) / img_dims)
 		* glm::vec2(width, height);
 }
+const glm::vec3& Camera::eye_pos() const {
+	return pos;
+}
 
 }
 

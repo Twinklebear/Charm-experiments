@@ -20,8 +20,11 @@ public:
 			const size_t width, const size_t height);
 	// Generate a ray going through the pixel at [x, y]. The coordinates should be in image space.
 	Ray generate_ray(const float x, const float y, const std::array<float, 2> &samples) const;
-	// Compute the pixel coordinates for a camera ray with some direction
+	// Compute the pixel coordinates for a camera ray with some direction.
+	// The direction passed should be normalized
 	glm::vec2 project_ray(const glm::vec3 &r) const;
+	// Get the eye position
+	const glm::vec3& eye_pos() const;
 };
 
 }
