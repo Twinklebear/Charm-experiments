@@ -18,7 +18,7 @@ class Region : public CBase_Region {
 	// the chare migrates
 	std::shared_ptr<pt::Sphere> my_object;
 	// TODO: We need to serialize this if the chare migrates
-	std::vector<pt::BBox> other_bounds;
+	std::vector<pt::BBox> other_bounds, other_screen_bounds;
 	uint64_t bounds_received;
 
 	std::mt19937 rng;
@@ -41,6 +41,8 @@ private:
 	void render_tile(std::vector<float> &tile, const uint64_t start_x, const uint64_t start_y);
 	// Check if this region has data which projects to the tile
 	bool touches_tile(const uint64_t start_x, const uint64_t start_y, const pt::BBox &box) const;
+	// Project the passed bounding box to the screen
+	pt::BBox project_bounds(const pt::BBox &b) const;
 };
 
 class BoundsMessage : public CMessage_BoundsMessage {
