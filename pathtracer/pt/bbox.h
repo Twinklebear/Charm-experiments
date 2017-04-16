@@ -21,6 +21,17 @@ struct BBox {
 	inline glm::vec3& operator[](const size_t i) {
 		return i == 0 ? min : max;
 	}
+	// Check if this box overlaps the one passed
+	inline bool overlaps(const BBox &b) const {
+		return max.x >= b.min.x && min.x <= b.max.x
+			&& max.y >= b.min.y && min.y <= b.max.y
+			&& max.z >= b.min.z && min.z <= b.max.z;
+	}
+	// Extend the box to include the passed point
+	inline void extend(const glm::vec3 &pt) {
+		max = glm::max(max, pt);
+		min = glm::min(min, pt);
+	}
 	// Fast box intersection
 	inline bool intersect(const Ray &r, const glm::vec3 &inv_dir, const std::array<int, 3> &neg_dir,
 			float *t_min = nullptr, float *t_max = nullptr) const {
