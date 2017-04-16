@@ -1,4 +1,5 @@
 #include <memory>
+#include <sstream>
 #include <algorithm>
 #include <iostream>
 #include <glm/glm.hpp>
@@ -62,6 +63,29 @@ void Region::send_bounds(BoundsMessage *msg) {
 	}
 }
 void Region::render() {
+	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
+	// or at least keep the scene alive, since the Region may have multiple geometry
+	const pt::Camera camera(scene->cam_pos, scene->cam_target, scene->cam_up, 65.0, IMAGE_W, IMAGE_H);
+
+	// Project the bounds of this regions data to the screen so we can determine which tiles
+	// the region touches, and thus needs to render
+	const pt::BBox bounds = my_object->bounds();
+	pt::BBox screen_bounds;
+	// Compute projection of the region's bounds
+	for (size_t i = 0; i < 2; ++i) {
+		for (size_t j = 0; j < 2; ++j) {
+			for (size_t k = 0; k < 2; ++k) {
+				const glm::vec3 d = glm::vec3(bounds[k].x, bounds[j].y, bounds[i].z) - camera.eye_pos();
+				const glm::vec2 p = camera.project_ray(glm::normalize(d));
+				screen_bounds.extend(glm::vec3(glm::ceil(p), 0.0));
+				screen_bounds.extend(glm::vec3(glm::floor(p), 0.0));
+			}
+		}
+	}
+	std::stringstream str;
+	str << "Region " << thisIndex << " screen bounds = " << screen_bounds << "\n";
+	CkPrintf("%s", str.str().c_str());
+
 	const uint64_t tiles_x = IMAGE_W / TILE_W;
 	const uint64_t tiles_y = IMAGE_H / TILE_H;
 	for (uint64_t ty = 0; ty < tiles_y; ++ty) {
@@ -76,11 +100,18 @@ void Region::render() {
 			// for telling how many tiles to expect in total? But how to decide
 			// which node without requiring everyone to do the test on all
 			// the regions anyway to find out who potentially touches the tile?
-			//if (touches_tile(tx * TILE_W, ty * TILE_H)) {
-				TileCompleteMessage *msg = new TileCompleteMessage(tx, ty, NUM_REGIONS);
+			TileCompleteMessage *msg = new TileCompleteMessage(tx, ty, NUM_REGIONS);
+			if (touches_tile(tx * TILE_W, ty * TILE_H, screen_bounds)) {
 				render_tile(msg->tile, tx * TILE_W, ty * TILE_H);
-				main_proxy.tile_done(msg);
-			//}
+			} else {
+				std::fill(msg->tile.begin(), msg->tile.end(), static_cast<float>(thisIndex) / NUM_REGIONS);
+				// Tweak depth to interleave which tiles we see for each node on the unowned ones
+				const float dval = tid % NUM_REGIONS == thisIndex ? 1e5 : std::numeric_limits<float>::infinity();
+				for (size_t i = 3; i < msg->tile.size(); i += 4) {
+					msg->tile[i] = dval;
+				}
+			}
+			main_proxy.tile_done(msg);
 		}
 	}
 }
@@ -89,10 +120,6 @@ void Region::render_tile(std::vector<float> &tile, const uint64_t start_x, const
 	// or at least keep the scene alive, since the Region may have multiple geometry
 	const pt::Camera camera(scene->cam_pos, scene->cam_target, scene->cam_up, 65.0, IMAGE_W, IMAGE_H);
 	pt::HitIntegrator integrator(pt::Scene({my_object}, {}));
-
-	// TODO: Use the project_ray function to compute the screen-space AABB of this
-	// region's bounds. Then check which tiles it overlaps with when determining
-	// if we need to render a specific tile for this region.
 
 	std::uniform_real_distribution<float> real_distrib;
 	for (uint64_t i = 0; i < TILE_H; ++i) {
@@ -120,27 +147,10 @@ void Region::render_tile(std::vector<float> &tile, const uint64_t start_x, const
 		}
 	}
 }
-bool Region::touches_tile(const uint64_t start_x, const uint64_t start_y) const {
-	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
-	// or at least keep the scene alive, since the Region may have multiple geometry
-	const pt::Camera camera(scene->cam_pos, scene->cam_target, scene->cam_up, 65.0, IMAGE_W, IMAGE_H);
-	// TODO: Do this test by projecting the box to the image and see if the AABB of the region's
-	// bounding box and seeing which tiles it touches.
-	const pt::BBox bounds = my_object->bounds();
-	const std::array<float, 2> sample_offset = {0.5, 0.5};
-	for (uint64_t i = 0; i < TILE_H; ++i) {
-		for (uint64_t j = 0; j < TILE_W; ++j) {
-			const float px = j + start_x;
-			const float py = i + start_y;
-			const pt::Ray ray = camera.generate_ray(px, py, sample_offset);
-			const glm::vec3 inv_dir = 1.f / ray.dir;
-			const std::array<int, 3> neg_dir = {ray.dir.x < 0 ? 1 : 0,
-				ray.dir.y < 0 ? 1 : 0, ray.dir.z < 0 ? 1 : 0};
-			if (bounds.intersect(ray, inv_dir, neg_dir)) {
-				return true;
-			}
-		}
-	}
+bool Region::touches_tile(const uint64_t start_x, const uint64_t start_y, const pt::BBox &bounds) const {
+	const pt::BBox tile_bounds(glm::vec3(start_x, start_y, 0.0),
+			glm::vec3(start_x + TILE_W, start_y + TILE_H, 0.0));
+	return bounds.overlaps(tile_bounds);
 }
 
 BoundsMessage::BoundsMessage(const uint64_t id, const pt::BBox &bounds) : id(id), bounds(bounds) {}

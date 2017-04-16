@@ -40,7 +40,7 @@ private:
 	// Render a tile of the image to the tile passed
 	void render_tile(std::vector<float> &tile, const uint64_t start_x, const uint64_t start_y);
 	// Check if this region has data which projects to the tile
-	bool touches_tile(const uint64_t start_x, const uint64_t start_y) const;
+	bool touches_tile(const uint64_t start_x, const uint64_t start_y, const pt::BBox &box) const;
 };
 
 class BoundsMessage : public CMessage_BoundsMessage {
