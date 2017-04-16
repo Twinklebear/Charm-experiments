@@ -16,7 +16,7 @@ class Region : public CBase_Region {
 	CProxySection_Region others;
 	// TODO: We need to serialize or save/reload the object if
 	// the chare migrates
-	std::shared_ptr<pt::Sphere> my_object;
+	std::shared_ptr<pt::Geometry> my_object;
 	// TODO: We need to serialize this if the chare migrates
 	std::vector<pt::BBox> other_bounds, other_screen_bounds;
 	uint64_t bounds_received;
