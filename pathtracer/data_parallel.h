@@ -4,9 +4,31 @@
 #include <vector>
 #include <set>
 #include <memory>
+#include <unordered_map>
 #include "pt/pt.h"
 
 class BoundsMessage;
+
+/* A tile we own which is being actively rendered. We could
+ * be the only region projecting to the tile and our objects
+ * be hit by each ray and thus will trivially render it locally,
+ * or it could be that we need to ship some primary rays or secondary
+ * rays out to other regions and track how many results back we expect
+ * for each pixel before this tile can be marked done.
+ */
+struct RenderingTile {
+	// The partial tile complete message we're rendering in to
+	TileCompleteMessage *tile;
+	// Count of how many results we're expecting back for each pixel in the tile.
+	// Once all entries are 0, this tile is finished.
+	std::vector<uint64_t> results_expected;
+
+	// Construct a new rendering tile, will expect 1 result per pixel by default.
+	RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const int64_t num_other_tiles);
+	// Report a rendering result for some pixel in this tile, result = {R, G, B, Z}
+	void report(const uint64_t x, const uint64_t y, const glm::vec4 &result);
+	bool complete() const;
+};
 
 /* A Region is an AABB in the world containing some of the distributed
  * scene data. TODO: It will render the pixels where it's the first hit
@@ -72,9 +94,6 @@ public:
 	// for compositing.
 	std::vector<float> tile;
 
-	// Non-owned tile message constructor
-	TileCompleteMessage(const uint64_t tile_x, const uint64_t tile_y);
-	// Owned tile message constructor
 	TileCompleteMessage(const uint64_t tile_x, const uint64_t tile_y,
 			const int64_t num_other_tiles);
 	bool tile_owner() const;

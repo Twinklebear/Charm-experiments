@@ -18,6 +18,23 @@ extern uint64_t TILE_W;
 extern uint64_t TILE_H;
 extern uint64_t NUM_REGIONS;
 
+RenderingTile::RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const int64_t num_other_tiles)
+	: tile(new TileCompleteMessage(tile_x, tile_y, num_other_tiles)), results_expected(TILE_W * TILE_H, 1)
+{}
+void RenderingTile::report(const uint64_t x, const uint64_t y, const glm::vec4 &result) {
+	const size_t tx = (x * TILE_W + y) * 4;
+	for (size_t c = 0; c < 4; ++c) {
+		tile->tile[tx + c] = result[c];
+	}
+	if (results_expected[x * TILE_W + y] == 0) {
+		throw std::runtime_error("Unexpected result reported on tile! #" + std::to_string(tile->tile_id));
+	}
+	results_expected[x * TILE_W + y] -= 1;
+}
+bool RenderingTile::complete() const {
+	return std::all_of(results_expected.begin(), results_expected.end(), [](const uint64_t &x) { return x == 0; });
+}
+
 Region::Region() : rng(std::random_device()()), bounds_received(0) {
 	if (thisIndex == 0) {
 		std::shared_ptr<pt::BxDF> lambertian_blue = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
@@ -108,6 +125,8 @@ void Region::render() {
 					++other_regions;
 				}
 			}
+			// TODO: If I'm not first for any pixel on this tile, I shouldn't send the
+			// final tile at all.
 			if (touches_tile(start_x, start_y, screen_bounds)) {
 				TileCompleteMessage *msg = new TileCompleteMessage(tx, ty, other_regions + 1);
 				render_tile(msg->tile, tx * TILE_W, ty * TILE_H, regions_in_tile);
@@ -213,9 +232,6 @@ void BoundsMessage::msg_pup(PUP::er &p) {
 }
 
 TileCompleteMessage::TileCompleteMessage() {}
-TileCompleteMessage::TileCompleteMessage(const uint64_t tile_x, const uint64_t tile_y)
-	: tile_x(tile_x), tile_y(tile_y), num_other_tiles(-1), tile(TILE_W * TILE_H * 4, 0)
-{}
 TileCompleteMessage::TileCompleteMessage(const uint64_t tile_x, const uint64_t tile_y,
 		const int64_t num_other_tiles)
 	: tile_x(tile_x), tile_y(tile_y), num_other_tiles(num_other_tiles), tile(TILE_W * TILE_H * 4, 0)
