@@ -27,7 +27,7 @@ Region::Region() : rng(std::random_device()()), bounds_received(0) {
 		my_object = std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.7, 1.0), 0.25, lambertian_blue);
 	} else {
 		std::shared_ptr<pt::BxDF> lambertian_white = std::make_shared<pt::Lambertian>(glm::vec3(0.8));
-		my_object = std::make_shared<pt::Plane>(glm::vec3(0, 0, -2), glm::vec3(0, 0, 1), 4, lambertian_white);
+		my_object = std::make_shared<pt::Plane>(glm::vec3(0, 0, -2), glm::vec3(0, 0, 1), 2.5, lambertian_white);
 	}
 	other_bounds.resize(NUM_REGIONS);
 }
@@ -100,41 +100,70 @@ void Region::render() {
 			const uint64_t start_x = tx * TILE_W;
 			const uint64_t start_y = ty * TILE_H;
 			// Count the number of other regions projecting to this tile
+			std::set<size_t> regions_in_tile;
 			size_t other_regions = 0;
-			for (const auto &b : other_screen_bounds) {
-				if (touches_tile(start_x, start_y, b)) {
+			for (size_t i = 0; i < other_screen_bounds.size(); ++i) {
+				if (touches_tile(start_x, start_y, other_screen_bounds[i])) {
+					regions_in_tile.insert(i);
 					++other_regions;
 				}
 			}
 			if (touches_tile(start_x, start_y, screen_bounds)) {
 				TileCompleteMessage *msg = new TileCompleteMessage(tx, ty, other_regions + 1);
-				render_tile(msg->tile, tx * TILE_W, ty * TILE_H);
+				render_tile(msg->tile, tx * TILE_W, ty * TILE_H, regions_in_tile);
 				main_proxy.tile_done(msg);
 			} else if (other_regions == 0 && tid % NUM_REGIONS == thisIndex) {
 				// It's our job to fill the tile with background color from the renderer,
 				// since no data projects to this tile.
 				TileCompleteMessage *msg = new TileCompleteMessage(tx, ty, 1);
-				render_tile(msg->tile, tx * TILE_W, ty * TILE_H);
+				render_tile(msg->tile, tx * TILE_W, ty * TILE_H, regions_in_tile);
 				main_proxy.tile_done(msg);
 			}
 		}
 	}
 }
-void Region::render_tile(std::vector<float> &tile, const uint64_t start_x, const uint64_t start_y) {
+void Region::render_tile(std::vector<float> &tile, const uint64_t start_x, const uint64_t start_y,
+		const std::set<size_t> &regions_in_tile)
+{
 	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
 	// or at least keep the scene alive, since the Region may have multiple geometry
 	const pt::Camera camera(scene->cam_pos, scene->cam_target, scene->cam_up, 65.0, IMAGE_W, IMAGE_H);
 	pt::HitIntegrator integrator(pt::Scene({my_object}, {}));
 
+	// We use a separate rng for primary ray directions so
+	// that all regions will see the same ray directions for
+	// each tile when testing who is first. TODO: in future send
+	// a set of random seeds to rotate through or something to have
+	// it not be totally deterministic.
+	std::mt19937 ray_dir_rng(start_x + start_y * IMAGE_W);
 	std::uniform_real_distribution<float> real_distrib;
 	for (uint64_t i = 0; i < TILE_H; ++i) {
 		for (uint64_t j = 0; j < TILE_W; ++j) {
 			const float px = j + start_x;
 			const float py = i + start_y;
-			pt::Ray ray = camera.generate_ray(px, py, {real_distrib(rng), real_distrib(rng)});
-			glm::vec3 color = integrator.integrate(ray);
-			if (color == glm::vec3(0)) {
-				color = glm::vec3(0.1);
+			pt::Ray ray = camera.generate_ray(px, py, {real_distrib(ray_dir_rng), real_distrib(ray_dir_rng)});
+
+			// Am I the first region along this ray? If so, render the pixel, otherwise skip it since someone
+			// else owns the primary ray and will send it on to me if I need to continue it.
+			float t_box = 0.0;
+			const glm::vec3 inv_dir = 1.f / ray.dir;
+			const std::array<int, 3> neg_dir = {ray.dir.x < 0 ? 1 : 0, ray.dir.y < 0 ? 1 : 0, ray.dir.z < 0 ? 1 : 0};
+			bool first_region = my_object->bounds().intersect(ray, inv_dir, neg_dir, &t_box) || regions_in_tile.empty();
+			ray.t_max = t_box;
+			for (const auto &r : regions_in_tile) {
+				if (other_bounds[r].intersect(ray, inv_dir, neg_dir)) {
+					first_region = false;
+					break;
+				}
+			}
+			ray.t_max = std::numeric_limits<float>::infinity();
+
+			glm::vec3 color(0.1);
+			if (first_region) {
+				color = integrator.integrate(ray);
+				if (color == glm::vec3(0)) {
+					color = glm::vec3(0.1);
+				}
 			}
 			// Tag the tiles based on who owns them
 			switch (thisIndex) {
