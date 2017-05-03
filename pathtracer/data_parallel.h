@@ -15,10 +15,14 @@ class BoundsMessage;
  * or it could be that we need to ship some primary rays or secondary
  * rays out to other regions and track how many results back we expect
  * for each pixel before this tile can be marked done.
+ *
+ * While the RenderingTile allocates the tile complete message it will
+ * not de-allocate it. It's expected that when it's finished you will send
+ * the message off thus passing ownership off to the messaging system.
  */
 struct RenderingTile {
 	// The partial tile complete message we're rendering in to
-	TileCompleteMessage *tile;
+	TileCompleteMessage *msg;
 	// Count of how many results we're expecting back for each pixel in the tile.
 	// Once all entries are 0, this tile is finished.
 	std::vector<uint64_t> results_expected;
@@ -42,6 +46,9 @@ class Region : public CBase_Region {
 	std::shared_ptr<pt::Geometry> my_object;
 	// TODO: We need to serialize this if the chare migrates
 	std::vector<pt::BBox> other_bounds, other_screen_bounds;
+	// Tile's we're actively rendering or waiting for results back from
+	// other nodes to complete rendering.
+	std::unordered_map<size_t, RenderingTile> rendering_tiles;
 	uint64_t bounds_received;
 
 	std::mt19937 rng;
@@ -61,7 +68,7 @@ public:
 
 private:
 	// Render a tile of the image to the tile passed
-	void render_tile(std::vector<float> &tile, const uint64_t start_x, const uint64_t start_y,
+	void render_tile(RenderingTile &tile, const uint64_t start_x, const uint64_t start_y,
 			const std::set<size_t> &regions_in_tile);
 	// Check if this region has data which projects to the tile
 	bool touches_tile(const uint64_t start_x, const uint64_t start_y, const pt::BBox &box) const;

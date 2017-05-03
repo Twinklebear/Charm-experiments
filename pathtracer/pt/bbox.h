@@ -33,7 +33,7 @@ struct BBox {
 		min = glm::min(min, pt);
 	}
 	// Fast box intersection
-	inline bool intersect(const Ray &r, const glm::vec3 &inv_dir, const std::array<int, 3> &neg_dir,
+	inline bool fast_intersect(const Ray &r, const glm::vec3 &inv_dir, const std::array<int, 3> &neg_dir,
 			float *t_min = nullptr, float *t_max = nullptr) const {
 		//Check X & Y intersection
 		float tmin = ((*this)[neg_dir[0]].x - r.origin.x) * inv_dir.x;
@@ -50,7 +50,7 @@ struct BBox {
 			tmax = tymax;
 		}
 
-		//Check Z intersection
+		// Check Z intersection
 		float tzmin = ((*this)[neg_dir[2]].z - r.origin.z) * inv_dir.z;
 		float tzmax = ((*this)[1 - neg_dir[2]].z - r.origin.z) * inv_dir.z;
 		if (tmin > tzmax || tzmin > tmax){
@@ -70,6 +70,21 @@ struct BBox {
 				*t_max = tmax;
 			}
 			return true;
+		}
+		return false;
+	}
+	// Intersect the ray with the box and update the ray's t_max
+	inline bool intersect(Ray &r, const glm::vec3 &inv_dir, const std::array<int, 3> &neg_dir) const {
+		float t_min = r.t_min;
+		float t_max = r.t_max;
+		if (fast_intersect(r, inv_dir, neg_dir, &t_min, &t_max)) {
+			if (t_min > r.t_min) {
+				r.t_max = t_min;
+				return true;
+			} else if (t_max < r.t_max) {
+				r.t_max = t_max;
+				return true;
+			}
 		}
 		return false;
 	}

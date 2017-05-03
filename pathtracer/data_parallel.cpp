@@ -19,15 +19,18 @@ extern uint64_t TILE_H;
 extern uint64_t NUM_REGIONS;
 
 RenderingTile::RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const int64_t num_other_tiles)
-	: tile(new TileCompleteMessage(tile_x, tile_y, num_other_tiles)), results_expected(TILE_W * TILE_H, 1)
+	: msg(new TileCompleteMessage(tile_x, tile_y, num_other_tiles)), results_expected(TILE_W * TILE_H, 1)
 {}
 void RenderingTile::report(const uint64_t x, const uint64_t y, const glm::vec4 &result) {
 	const size_t tx = (x * TILE_W + y) * 4;
+	// TODO: This should turn into an accumulation where we know how many rays we sent
+	// for the pixel plus (optionally) the primary ray branch factor and we accumulate
+	// until we get all the results back then normalize the color values.
 	for (size_t c = 0; c < 4; ++c) {
-		tile->tile[tx + c] = result[c];
+		msg->tile[tx + c] = result[c];
 	}
 	if (results_expected[x * TILE_W + y] == 0) {
-		throw std::runtime_error("Unexpected result reported on tile! #" + std::to_string(tile->tile_id));
+		throw std::runtime_error("Unexpected result reported on tile! #" + std::to_string(msg->tile_id));
 	}
 	results_expected[x * TILE_W + y] -= 1;
 }
@@ -128,20 +131,22 @@ void Region::render() {
 			// TODO: If I'm not first for any pixel on this tile, I shouldn't send the
 			// final tile at all.
 			if (touches_tile(start_x, start_y, screen_bounds)) {
-				TileCompleteMessage *msg = new TileCompleteMessage(tx, ty, other_regions + 1);
-				render_tile(msg->tile, tx * TILE_W, ty * TILE_H, regions_in_tile);
-				main_proxy.tile_done(msg);
+				auto it = rendering_tiles.emplace(tid, RenderingTile(tx, ty, other_regions + 1));
+				render_tile(it.first->second, tx * TILE_W, ty * TILE_H, regions_in_tile);
+				if (it.first->second.complete()) {
+					main_proxy.tile_done(it.first->second.msg);
+				}
 			} else if (other_regions == 0 && tid % NUM_REGIONS == thisIndex) {
 				// It's our job to fill the tile with background color from the renderer,
 				// since no data projects to this tile.
-				TileCompleteMessage *msg = new TileCompleteMessage(tx, ty, 1);
-				render_tile(msg->tile, tx * TILE_W, ty * TILE_H, regions_in_tile);
-				main_proxy.tile_done(msg);
+				RenderingTile tile(tx, ty, 1);
+				render_tile(tile, tx * TILE_W, ty * TILE_H, regions_in_tile);
+				main_proxy.tile_done(tile.msg);
 			}
 		}
 	}
 }
-void Region::render_tile(std::vector<float> &tile, const uint64_t start_x, const uint64_t start_y,
+void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint64_t start_y,
 		const std::set<size_t> &regions_in_tile)
 {
 	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
@@ -164,11 +169,10 @@ void Region::render_tile(std::vector<float> &tile, const uint64_t start_x, const
 
 			// Am I the first region along this ray? If so, render the pixel, otherwise skip it since someone
 			// else owns the primary ray and will send it on to me if I need to continue it.
-			float t_box = 0.0;
 			const glm::vec3 inv_dir = 1.f / ray.dir;
 			const std::array<int, 3> neg_dir = {ray.dir.x < 0 ? 1 : 0, ray.dir.y < 0 ? 1 : 0, ray.dir.z < 0 ? 1 : 0};
-			bool first_region = my_object->bounds().intersect(ray, inv_dir, neg_dir, &t_box) || regions_in_tile.empty();
-			ray.t_max = t_box;
+			bool first_region = my_object->bounds().intersect(ray, inv_dir, neg_dir)
+				|| regions_in_tile.empty();
 			for (const auto &r : regions_in_tile) {
 				if (other_bounds[r].intersect(ray, inv_dir, neg_dir)) {
 					first_region = false;
@@ -179,6 +183,8 @@ void Region::render_tile(std::vector<float> &tile, const uint64_t start_x, const
 
 			glm::vec3 color(0.1);
 			if (first_region) {
+				// TODO: If we didn't hit anything, find the next region along the ray and send
+				// the ray to it for rendering
 				color = integrator.integrate(ray);
 				if (color == glm::vec3(0)) {
 					color = glm::vec3(0.1);
@@ -192,11 +198,7 @@ void Region::render_tile(std::vector<float> &tile, const uint64_t start_x, const
 				default: break;
 			}
 
-			const size_t tx = (i * TILE_W + j) * 4;
-			for (size_t c = 0; c < 3; ++c) {
-				tile[tx + c] = color[c];
-			}
-			tile[tx + 3] = ray.t_max;
+			tile.report(i, j, glm::vec4(color, ray.t_max));
 		}
 	}
 }
@@ -234,7 +236,8 @@ void BoundsMessage::msg_pup(PUP::er &p) {
 TileCompleteMessage::TileCompleteMessage() {}
 TileCompleteMessage::TileCompleteMessage(const uint64_t tile_x, const uint64_t tile_y,
 		const int64_t num_other_tiles)
-	: tile_x(tile_x), tile_y(tile_y), num_other_tiles(num_other_tiles), tile(TILE_W * TILE_H * 4, 0)
+	: tile_x(tile_x), tile_y(tile_y), tile_id(tile_x + IMAGE_W / TILE_W * tile_y),
+	num_other_tiles(num_other_tiles), tile(TILE_W * TILE_H * 4, 0)
 {}
 bool TileCompleteMessage::tile_owner() const {
 	return num_other_tiles > -1;

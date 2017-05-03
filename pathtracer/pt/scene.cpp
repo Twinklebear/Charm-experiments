@@ -14,7 +14,7 @@ bool Scene::intersect(Ray &ray, DifferentialGeometry &dg) const {
 	};
 	return std::accumulate(geometry.begin(), geometry.end(), false,
 		[&](const bool &hit, const std::shared_ptr<Geometry> &g) {
-			if (g->bounds().intersect(ray, inv_dir, neg_dir)) {
+			if (g->bounds().fast_intersect(ray, inv_dir, neg_dir)) {
 				return g->intersect(ray, dg) || hit;
 			} else {
 				return hit;
