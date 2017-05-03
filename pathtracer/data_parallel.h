@@ -8,6 +8,8 @@
 #include "pt/pt.h"
 
 class BoundsMessage;
+class SendRayMessage;
+class RayResultMessage;
 
 /* A tile we own which is being actively rendered. We could
  * be the only region projecting to the tile and our objects
@@ -31,6 +33,8 @@ struct RenderingTile {
 	RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const int64_t num_other_tiles);
 	// Report a rendering result for some pixel in this tile, result = {R, G, B, Z}
 	void report(const uint64_t x, const uint64_t y, const glm::vec4 &result);
+	// Report a rendering result for some pixel in this tile, result = {R, G, B, Z}
+	void report(const uint64_t px, const glm::vec4 &result);
 	bool complete() const;
 };
 
@@ -65,6 +69,10 @@ public:
 	// Render the region tiles which this region projects to,
 	// compute and send primary rays for any pixels where this Region is the closest box
 	void render();
+	// Send a ray for traversal through this region's data.
+	void send_ray(SendRayMessage *msg);
+	// Report the result of rendering a ray spawned from one of this regions primary rays
+	void report_ray(RayResultMessage *msg);
 
 private:
 	// Render a tile of the image to the tile passed
@@ -108,5 +116,32 @@ public:
 	void msg_pup(PUP::er &p);
 	static void* pack(TileCompleteMessage *msg);
 	static TileCompleteMessage* unpack(void *buf);
+};
+
+class SendRayMessage : public CMessage_SendRayMessage {
+	SendRayMessage();
+
+public:
+	uint64_t owner_id, tile, pixel;
+	// TODO: Packets or larger chunks of rays, compression.
+	// Should convert renderer to a stream system and send sorted
+	// SoA ray groups which we compress w/ ZFP.
+	pt::Ray ray;
+
+	SendRayMessage(uint64_t owner_id, uint64_t tile, uint64_t pixel, const pt::Ray &ray);
+	void msg_pup(PUP::er &p);
+};
+
+class RayResultMessage : public CMessage_RayResultMessage {
+	RayResultMessage();
+
+public:
+	// RGBAZ of the rendering result. If Z = INF then there was no hit
+	// TODO: Again, packets or larger, compression, etc.
+	glm::vec4 result;
+	uint64_t tile, pixel;
+
+	RayResultMessage(const glm::vec4 &result, uint64_t tile, uint64_t pixel);
+	void msg_pup(PUP::er &p);
 };
 

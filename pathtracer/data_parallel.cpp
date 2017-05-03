@@ -22,17 +22,21 @@ RenderingTile::RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const
 	: msg(new TileCompleteMessage(tile_x, tile_y, num_other_tiles)), results_expected(TILE_W * TILE_H, 1)
 {}
 void RenderingTile::report(const uint64_t x, const uint64_t y, const glm::vec4 &result) {
-	const size_t tx = (x * TILE_W + y) * 4;
+	const size_t tx = x * TILE_W + y;
+	report(tx, result);
+}
+void RenderingTile::report(const uint64_t px, const glm::vec4 &result) {
+	const size_t tx = px * 4;
 	// TODO: This should turn into an accumulation where we know how many rays we sent
 	// for the pixel plus (optionally) the primary ray branch factor and we accumulate
 	// until we get all the results back then normalize the color values.
 	for (size_t c = 0; c < 4; ++c) {
 		msg->tile[tx + c] = result[c];
 	}
-	if (results_expected[x * TILE_W + y] == 0) {
+	if (results_expected[px] == 0) {
 		throw std::runtime_error("Unexpected result reported on tile! #" + std::to_string(msg->tile_id));
 	}
-	results_expected[x * TILE_W + y] -= 1;
+	results_expected[px] -= 1;
 }
 bool RenderingTile::complete() const {
 	return std::all_of(results_expected.begin(), results_expected.end(), [](const uint64_t &x) { return x == 0; });
@@ -146,6 +150,40 @@ void Region::render() {
 		}
 	}
 }
+void Region::send_ray(SendRayMessage *msg) {
+	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
+	// or at least keep the scene alive, since the Region may have multiple geometry
+	pt::HitIntegrator integrator(pt::Scene({my_object}, {}));
+	glm::vec3 color = integrator.integrate(msg->ray);
+	// If the ray misses us too, send it along. TODO: We need to determine who is actually
+	// the next node to send the ray too based on where it's been previously.
+	if (color == glm::vec3(0)) {
+		color = glm::vec3(0.1);
+	}
+	// Tag the result based on who rendered it them
+	switch (thisIndex) {
+		case 0: color *= glm::vec3(1, 0, 0); break;
+		case 1: color *= glm::vec3(0, 1, 0); break;
+		case 2: color *= glm::vec3(0, 0, 1); break;
+		default: break;
+	}
+	// Send the result back
+	thisProxy[msg->owner_id].report_ray(new RayResultMessage(glm::vec4(color, msg->ray.t_max),
+				msg->tile, msg->pixel));
+	delete msg;
+}
+void Region::report_ray(RayResultMessage *msg) {
+	auto rt = rendering_tiles.find(msg->tile);
+	if (rt == rendering_tiles.end()) {
+		throw std::runtime_error("Invalid msg->tile id in RayResultMessage!");
+	}
+	rt->second.report(msg->pixel, msg->result);
+	delete msg;
+
+	if (rt->second.complete()) {
+		main_proxy.tile_done(rt->second.msg);
+	}
+}
 void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint64_t start_y,
 		const std::set<size_t> &regions_in_tile)
 {
@@ -183,22 +221,37 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 
 			glm::vec3 color(0.1);
 			if (first_region) {
-				// TODO: If we didn't hit anything, find the next region along the ray and send
+				// If we didn't hit anything, find the next region along the ray and send
 				// the ray to it for rendering
 				color = integrator.integrate(ray);
 				if (color == glm::vec3(0)) {
-					color = glm::vec3(0.1);
+					//color = glm::vec3(0.1);
+					uint64_t next = -1;
+					for (const auto &r : regions_in_tile) {
+						if (other_bounds[r].intersect(ray, inv_dir, neg_dir)) {
+							next = r;
+						}
+					}
+					ray.t_max = std::numeric_limits<float>::infinity();
+
+					// If no one else intersects this ray, we'll just write the background color
+					if (next < NUM_REGIONS) {
+						thisProxy[next].send_ray(new SendRayMessage(thisIndex, tile.msg->tile_id, i * TILE_W + j, ray));
+					} else {
+						color = glm::vec3(0.1);
+					}
 				}
 			}
-			// Tag the tiles based on who owns them
-			switch (thisIndex) {
-				case 0: color *= glm::vec3(1, 0, 0); break;
-				case 1: color *= glm::vec3(0, 1, 0); break;
-				case 2: color *= glm::vec3(0, 0, 1); break;
-				default: break;
+			if (color != glm::vec3(0)) {
+				// Tag the tiles based on who owns them
+				switch (thisIndex) {
+					case 0: color *= glm::vec3(1, 0, 0); break;
+					case 1: color *= glm::vec3(0, 1, 0); break;
+					case 2: color *= glm::vec3(0, 0, 1); break;
+					default: break;
+				}
+				tile.report(i, j, glm::vec4(color, ray.t_max));
 			}
-
-			tile.report(i, j, glm::vec4(color, ray.t_max));
 		}
 	}
 }
@@ -266,6 +319,27 @@ TileCompleteMessage* TileCompleteMessage::unpack(void *buf) {
 	msg->msg_pup(from_mem);
 	CkFreeMsg(buf);
 	return msg;
+}
+
+SendRayMessage::SendRayMessage() : ray(glm::vec3(NAN), glm::vec3(NAN)) {}
+SendRayMessage::SendRayMessage(uint64_t owner_id, uint64_t tile, uint64_t pixel, const pt::Ray &ray)
+	: owner_id(owner_id), tile(tile), pixel(pixel), ray(ray)
+{}
+void SendRayMessage::msg_pup(PUP::er &p) {
+	p | owner_id;
+	p | tile;
+	p | pixel;
+	p | ray;
+}
+
+RayResultMessage::RayResultMessage() {}
+RayResultMessage::RayResultMessage(const glm::vec4 &result, uint64_t tile, uint64_t pixel)
+	: result(result), tile(tile), pixel(pixel)
+{}
+void RayResultMessage::msg_pup(PUP::er &p) {
+	p | result;
+	p | tile;
+	p | pixel;
 }
 
 #include "data_parallel.def.h"
