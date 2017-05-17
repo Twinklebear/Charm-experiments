@@ -168,6 +168,9 @@ void Region::send_ray(SendRayMessage *msg) {
 		default: break;
 	}
 	// Send the result back
+	// TODO: We need to continue the ray on potentially, but must know its traversal
+	// state. Otherwise we might send the ray back to someone who previously traversed
+	// it and sent it to us, creating a loop.
 	thisProxy[msg->owner_id].report_ray(new RayResultMessage(glm::vec4(color, msg->ray.t_max),
 				msg->tile, msg->pixel));
 	delete msg;
