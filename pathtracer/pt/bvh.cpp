@@ -28,11 +28,11 @@ BVH::BuildNode::BuildNode(int split, std::unique_ptr<BuildNode> a, std::unique_p
 	bounds.box_union(children[1]->bounds);
 }
 
-BVH::BVH(const std::vector<Geometry*> &geom, size_t max_geom)
+BVH::BVH(const std::vector<const Geometry*> &geom, size_t max_geom)
 	: max_geom(std::min(size_t(256), max_geom)), geometry(geom)
 {
 	// If we didn't get any geometry to partition then we don't have to do anything
-	if (geometry.empty()){
+	if (geometry.empty()) {
 		return;
 	}
 	// Get bounds and index info together for the geometry we're storing
@@ -42,7 +42,7 @@ BVH::BVH(const std::vector<Geometry*> &geom, size_t max_geom)
 		build_geom.emplace_back(i, geometry[i]->bounds());
 	}
 
-	std::vector<Geometry*> ordered_geom;
+	std::vector<const Geometry*> ordered_geom;
 	ordered_geom.reserve(geometry.size());
 	size_t total_nodes = 0;
 	std::unique_ptr<BuildNode> root = build(build_geom, ordered_geom, 0, geometry.size(), total_nodes);
@@ -58,7 +58,7 @@ BVH::BVH(const std::vector<Geometry*> &geom, size_t max_geom)
 BBox BVH::bounds() const {
 	return !flat_nodes.empty() ? flat_nodes[0].bounds : BBox{};
 }
-bool BVH::intersect(Ray &r, DifferentialGeometry &diff_geom) const {
+bool BVH::intersect(Ray &r, DifferentialGeometry &dg) const {
 	if (flat_nodes.empty()){
 		return false;
 	}
@@ -77,7 +77,7 @@ bool BVH::intersect(Ray &r, DifferentialGeometry &diff_geom) const {
 			//If it's a leaf node check the geometry
 			if (fnode.ngeom > 0) {
 				for (uint32_t i = 0; i < fnode.ngeom; ++i) {
-					if (geometry[fnode.geom_offset + i]->intersect(r, diff_geom)){
+					if (geometry[fnode.geom_offset + i]->intersect(r, dg)){
 						hit = true;
 					}
 				}
@@ -108,7 +108,7 @@ bool BVH::intersect(Ray &r, DifferentialGeometry &diff_geom) const {
 	return hit;
 }
 std::unique_ptr<BVH::BuildNode> BVH::build(std::vector<GeomInfo> &build_geom,
-		std::vector<Geometry*> &ordered_geom, size_t start, size_t end, size_t &total_nodes)
+		std::vector<const Geometry*> &ordered_geom, size_t start, size_t end, size_t &total_nodes)
 {
 	++total_nodes;
 	// Find total bounds for the geometry we're trying to store
@@ -127,7 +127,7 @@ std::unique_ptr<BVH::BuildNode> BVH::build(std::vector<GeomInfo> &build_geom,
 	// with the most variation
 	BBox centroids;
 	for (size_t i = start; i < end; ++i){
-		centroids.box_union(build_geom[i].center);
+		centroids.extend(build_geom[i].center);
 	}
 	const int axis = centroids.max_extent();
 	size_t mid = (start + end) / 2;
@@ -136,7 +136,7 @@ std::unique_ptr<BVH::BuildNode> BVH::build(std::vector<GeomInfo> &build_geom,
 	if (centroids.max[axis] == centroids.min[axis]){
 		// Check that we can fit all the geometry into a single leaf node, if not we need
 		// to force a split
-		if (ngeom < max_geom){
+		if (ngeom < max_geom) {
 			return build_leaf(build_geom, ordered_geom, start, end, box);
 		} else {
 			return std::make_unique<BuildNode>(axis,
@@ -147,7 +147,6 @@ std::unique_ptr<BVH::BuildNode> BVH::build(std::vector<GeomInfo> &build_geom,
 	// Partition the primitives based on the surface area heuristic
 	// If there's only a few primitives just use EQUAL and break
 	if (ngeom < 5) {
-		mid = (start + end) / 2;
 		std::nth_element(build_geom.begin() + start, build_geom.begin() + mid,
 				build_geom.begin() + end,
 				[axis](const GeomInfo &a, const GeomInfo &b){
@@ -206,7 +205,7 @@ std::unique_ptr<BVH::BuildNode> BVH::build(std::vector<GeomInfo> &build_geom,
 		build(build_geom, ordered_geom, mid, end, total_nodes));
 }
 std::unique_ptr<BVH::BuildNode> BVH::build_leaf(std::vector<GeomInfo> &build_geom,
-		std::vector<Geometry*> &ordered_geom, size_t start, size_t end, const BBox &box)
+		std::vector<const Geometry*> &ordered_geom, size_t start, size_t end, const BBox &box)
 {
 	const size_t ngeom = end - start;
 	// Store the offset to this leaf's geometry then push it on

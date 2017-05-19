@@ -70,7 +70,7 @@ class BVH {
 	// Max amount of geometry per leaf node
 	size_t max_geom;
 	// The geometry being stored in this BVH
-	std::vector<Geometry*> geometry;
+	std::vector<const Geometry*> geometry;
 	// The final flatted BVH structure
 	std::vector<FlatNode> flat_nodes;
 
@@ -80,12 +80,12 @@ public:
 	 * can be stored per node, default is 128, max is 256
 	 * The defaults for the empty constructor will build an empty BVH
 	 */
-	BVH(const std::vector<Geometry*> &geom = std::vector<Geometry*>{},
+	BVH(const std::vector<const Geometry*> &geom = std::vector<const Geometry*>{},
 		size_t max_geom = 128);
 	// Get the bounds for the BVH
 	BBox bounds() const;
 	// Perform an intersection test on the geometry stored in the BVH
-	bool intersect(Ray &ray, DifferentialGeometry &diff_geom) const;
+	bool intersect(Ray &ray, DifferentialGeometry &dg) const;
 
 private:
 	/* Construct a subtree of the BVH for the build_geom from [start, end)
@@ -94,13 +94,15 @@ private:
 	 * Also returns the total nodes in this subtree, for use later when flattening
 	 * the BVH
 	 */
-	std::unique_ptr<BuildNode> build(std::vector<GeomInfo> &build_geom, std::vector<Geometry*> &ordered_geom,
-		size_t start, size_t end, size_t &total_nodes);
+	std::unique_ptr<BuildNode> build(std::vector<GeomInfo> &build_geom,
+			std::vector<const Geometry*> &ordered_geom, size_t start, size_t end,
+			size_t &total_nodes);
 	/* Build a leaf node in the tree using the geometry passed and push the ordered geometry for the
 	 * leaf into ordered_geom
 	 */
-	std::unique_ptr<BuildNode> build_leaf(std::vector<GeomInfo> &build_geom, std::vector<Geometry*> &ordered_geom,
-		size_t start, size_t end, const BBox &box);
+	std::unique_ptr<BuildNode> build_leaf(std::vector<GeomInfo> &build_geom,
+			std::vector<const Geometry*> &ordered_geom,
+			size_t start, size_t end, const BBox &box);
 	/* Recursively flatten the BVH tree into the flat nodes vector
 	 * offset tracks the current offset into the flat nodes vector
 	 */
