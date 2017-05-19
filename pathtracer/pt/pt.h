@@ -17,6 +17,7 @@
 #include "scene.h"
 #include "light.h"
 #include "brdf.h"
+#include "bvh.h"
 
 #include "stb_image.h"
 #include "stb_image_write.h"

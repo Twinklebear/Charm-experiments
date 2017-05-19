@@ -32,10 +32,31 @@ struct BBox {
 		max = glm::max(max, pt);
 		min = glm::min(min, pt);
 	}
+	// Union this box with the other one
+	inline void box_union(const BBox &b) {
+		min = glm::min(min, b.min);
+		max = glm::max(max, b.max);
+	}
+	inline int max_extent() const {
+		const glm::vec3 d = max - min;
+		if (d.x > d.y && d.x > d.z) {
+			return 0;
+		} else if (d.y > d.z) {
+			return 1;
+		}
+		return 2;
+	}
+	inline glm::vec3 center() const {
+		return glm::lerp(min, max, 0.5f);
+	}
+	inline float surface_area() const {
+		const glm::vec3 d = max - min;
+		return 2.f * (d.x * d.y + d.x * d.z + d.y * d.z);
+	}
 	// Fast box intersection
 	inline bool fast_intersect(const Ray &r, const glm::vec3 &inv_dir, const std::array<int, 3> &neg_dir,
 			float *t_min = nullptr, float *t_max = nullptr) const {
-		//Check X & Y intersection
+		// Check X & Y intersection
 		float tmin = ((*this)[neg_dir[0]].x - r.origin.x) * inv_dir.x;
 		float tmax = ((*this)[1 - neg_dir[0]].x - r.origin.x) * inv_dir.x;
 		float tymin = ((*this)[neg_dir[1]].y - r.origin.y) * inv_dir.y;

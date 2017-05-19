@@ -3,9 +3,11 @@
 #include <memory>
 #include <vector>
 #include <array>
+#include <glm/glm.hpp>
 #include "ray.h"
 #include "bbox.h"
 #include "geometry.h"
+#include "diff_geom.h"
 
 // TODO: Rewrite to use Afra & Szirmay-Kalos's stackless MBVH2 traversal
 // and clean up code to integrate into libpt
@@ -22,7 +24,7 @@ class BVH {
 		// The index of the geometry in the BVH's geometry vector
 		size_t geom_idx;
 		// Center of the geometry's bounding box
-		Point center;
+		glm::vec3 center;
 		BBox bounds;
 
 		GeomInfo(size_t i, const BBox &b);
@@ -37,17 +39,15 @@ class BVH {
 		 */
 		size_t geom_offset, ngeom;
 		BBox bounds;
-		// Which axis was split to form this node's children
-		AXIS split;
+		// Which axis was split to form this node's children, 0 = X, 1 = Y, 2 = Z
+		int split;
 
-		/*
-		 * Construct a leaf node
+		/* Construct a leaf node
 		 */
 		BuildNode(size_t geom_offset, size_t ngeom, const BBox &bounds);
-		/*
-		 * Construct an interior node, where a & b are the node's children
+		/* Construct an interior node, where a & b are the node's children
 		 */
-		BuildNode(AXIS split, std::unique_ptr<BuildNode> a, std::unique_ptr<BuildNode> b);
+		BuildNode(int split, std::unique_ptr<BuildNode> a, std::unique_ptr<BuildNode> b);
 	};
 
 	/* Nodes used to store the final flattened BVH structure, the first child
@@ -62,15 +62,16 @@ class BVH {
 			// Used for interiors to locate second child
 			size_t second_child;
 		};
-		//Number of geometry stored in this node, 0 if interior
+		// Number of geometry stored in this node, 0 if interior
 		uint16_t ngeom;
 		uint16_t axis;
 	};
 
+	// Max amount of geometry per leaf node
 	size_t max_geom;
-	//The geometry being stored in this BVH
+	// The geometry being stored in this BVH
 	std::vector<Geometry*> geometry;
-	//The final flatted BVH structure
+	// The final flatted BVH structure
 	std::vector<FlatNode> flat_nodes;
 
 public:

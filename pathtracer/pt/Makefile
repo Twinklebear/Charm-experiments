@@ -5,7 +5,7 @@ CXXFLAGS=-Wall -Wextra -pedantic -std=c++14 \
 SRCS=ray.cpp camera.cpp sphere.cpp stb_image.cpp hit_integrator.cpp \
 	 normal_integrator.cpp whitted_integrator.cpp scene.cpp \
 	 light.cpp plane.cpp brdf.cpp mc.cpp diff_geom.cpp \
-	 geometry.cpp path_integrator.cpp
+	 geometry.cpp path_integrator.cpp bvh.cpp
 HEADERS=$(wildcard *.h)
 OBJS=$(SRCS:.cpp=.o)
 
