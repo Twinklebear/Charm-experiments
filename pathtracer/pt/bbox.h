@@ -11,9 +11,11 @@ namespace pt {
 struct BBox {
 	glm::vec3 min, max;
 
-	inline BBox(const glm::vec3 &min = glm::vec3(std::numeric_limits<float>::infinity()),
-			const glm::vec3 &max = -glm::vec3(std::numeric_limits<float>::infinity()))
+	inline BBox(const glm::vec3 &min, const glm::vec3 &max)
 		: min(min), max(max)
+	{}
+	inline BBox() : min(glm::vec3(std::numeric_limits<float>::infinity())),
+		max(-glm::vec3(std::numeric_limits<float>::infinity()))
 	{}
 	inline const glm::vec3& operator[](const size_t i) const {
 		return i == 0 ? min : max;
@@ -29,8 +31,8 @@ struct BBox {
 	}
 	// Extend the box to include the passed point
 	inline void extend(const glm::vec3 &pt) {
-		max = glm::max(max, pt);
 		min = glm::min(min, pt);
+		max = glm::max(max, pt);
 	}
 	// Union this box with the other one
 	inline void box_union(const BBox &b) {
@@ -39,9 +41,9 @@ struct BBox {
 	}
 	inline int max_extent() const {
 		const glm::vec3 d = max - min;
-		if (d.x > d.y && d.x > d.z) {
+		if (d.x >= d.y && d.x >= d.z) {
 			return 0;
-		} else if (d.y > d.z) {
+		} else if (d.y >= d.z) {
 			return 1;
 		}
 		return 2;
