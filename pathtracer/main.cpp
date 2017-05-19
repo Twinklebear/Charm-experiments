@@ -94,7 +94,7 @@ Main::Main(CkArgMsg *msg) : done_count(0), spp(1), samples_taken(0) {
 	scene = new SceneMessage(cam_pos, cam_target, cam_up);
 	CkPrintf("Rendering %dx%d image with %dx%d tile size\n", IMAGE_W, IMAGE_H, TILE_W, TILE_H);
 
-	if (false) {
+	if (true) {
 		CkPrintf("Rendering image-parallel\n");
 		img_tiles = CProxy_ImageParallelTile::ckNew(tiles_x, tiles_y);
 		start_pass = start_render = std::chrono::high_resolution_clock::now();
