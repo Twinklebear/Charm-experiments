@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <limits>
+#include <array>
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 #include "ray.h"
