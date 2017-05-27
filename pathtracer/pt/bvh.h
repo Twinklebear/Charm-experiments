@@ -9,14 +9,11 @@
 #include "geometry.h"
 #include "diff_geom.h"
 
-// TODO: Rewrite to use Afra & Szirmay-Kalos's stackless MBVH2 traversal
-// and clean up code to integrate into libpt
-
 namespace pt {
 
-/* A BVH2 built off of the one introduced in PBR and
- * modified to use Afta and Szirmay-Kalos's stackless traversal
- * algorithm.
+/* A BVH2 built off of the one introduced in PBR and modified to
+ * use Afta and Szirmay-Kalos's stackless traversal algorithm from
+ * "Stackless Multi-BVH Traversal for CPU, MIC and GPU Ray Tracing"
  */
 class BVH {
 	// Information about some geometry being place in the BVH
@@ -62,6 +59,8 @@ class BVH {
 			// Used for interiors to locate second child
 			size_t second_child;
 		};
+		size_t sibling;
+		size_t parent;
 		// Number of geometry stored in this node, 0 if interior
 		uint16_t ngeom;
 		uint16_t axis;
@@ -88,6 +87,12 @@ public:
 	bool intersect(Ray &ray, DifferentialGeometry &dg) const;
 
 private:
+	// Standard stack-based traversal algorithm for the BVH
+	bool intersect_stack(Ray &ray, DifferentialGeometry &dg) const;
+	/* Implementation of Afra & Szirmay-Kalos stackless traversal,
+	 * see the paper 'Stackless Multi-BVH Traversal for CPU, MIC and GPU Ray Tracing'
+	 */
+	bool intersect_stackless(Ray &ray, DifferentialGeometry &dg) const;
 	/* Construct a subtree of the BVH for the build_geom from [start, end)
 	 * and return the root of this subtree. The geometry is placed in the child
 	 * nodes is partitioned into ordered geom for easier look up later

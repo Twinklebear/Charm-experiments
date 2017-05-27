@@ -62,15 +62,14 @@ bool BVH::intersect(Ray &r, DifferentialGeometry &dg) const {
 	if (flat_nodes.empty()){
 		return false;
 	}
+	return intersect_stackless(r, dg);
+}
+bool BVH::intersect_stack(Ray &r, DifferentialGeometry &dg) const {
 	bool hit = false;
 	const glm::vec3 inv_dir = glm::vec3(1.f) / r.dir;
 	const std::array<int, 3> neg_dir = {inv_dir.x < 0, inv_dir.y < 0, inv_dir.z < 0};
-	// TODO: Replace with Afra and Szirmay-Kalos stackless bitstring traversal
-	// make possible to get this string out so we can traverse regions, not necessarily
-	// geometry we're interesting. On a local node we'd use Embree, at the data distribution
-	// level (and maybe 1 or 2 down to local data) we'd use this BVH
-	std::array<int, 64> todo;
-	int todo_offset = 0, current = 0;
+	std::array<size_t, 64> todo;
+	size_t todo_offset = 0, current = 0;
 	while (true) {
 		const FlatNode &fnode = flat_nodes[current];
 		if (fnode.bounds.fast_intersect(r, inv_dir, neg_dir)) {
@@ -104,6 +103,58 @@ bool BVH::intersect(Ray &r, DifferentialGeometry &dg) const {
 			}
 			current = todo[--todo_offset];
 		}
+	}
+	return hit;
+}
+bool BVH::intersect_stackless(Ray &r, DifferentialGeometry &dg) const {
+	const glm::vec3 inv_dir = glm::vec3(1.f) / r.dir;
+	const std::array<int, 3> neg_dir = {inv_dir.x < 0, inv_dir.y < 0, inv_dir.z < 0};
+	size_t current = 0;
+	size_t bitstack = 0;
+	bool hit = false;
+	while (true) {
+		const FlatNode &fnode = flat_nodes[current];
+		// If it's a leaf node check the geometry
+		if (fnode.ngeom > 0) {
+			for (uint32_t i = 0; i < fnode.ngeom; ++i) {
+				if (geometry[fnode.geom_offset + i]->intersect(r, dg)) {
+					hit = true;
+				}
+			}
+		} else {
+			// Check which (if any) children we hit
+			const std::array<bool, 2> child_hits{
+				flat_nodes[current + 1].bounds.fast_intersect(r, inv_dir, neg_dir),
+				flat_nodes[fnode.second_child].bounds.fast_intersect(r, inv_dir, neg_dir)
+			};
+			if (child_hits[0] || child_hits[1]) {
+				bitstack = bitstack << 1;
+				// If we hit both children enter the nearer one and push a 1 onto the stack
+				if (child_hits[0] && child_hits[1]) {
+					bitstack = bitstack | 1;
+					if (neg_dir[fnode.axis]) {
+						current = fnode.second_child;
+					} else {
+						++current;
+					}
+				} else if (child_hits[0]) {
+					++current;
+				} else {
+					current = fnode.second_child;
+				}
+				continue;
+			}
+		}
+		// Backtracking up the stack to the next node we should traverse
+		while ((bitstack & 1) == 0) {
+			if (!bitstack) {
+				return hit;
+			}
+			current = flat_nodes[current].parent;
+			bitstack = bitstack >> 1;
+		}
+		current = flat_nodes[current].sibling;
+		bitstack = bitstack ^ 1;
 	}
 	return hit;
 }
@@ -226,8 +277,12 @@ size_t BVH::flatten_tree(const std::unique_ptr<BuildNode> &node, size_t &offset)
 	} else {
 		fnode.axis = node->split;
 		fnode.ngeom = 0;
-		flatten_tree(node->children[0], offset);
+		const size_t first_child = flatten_tree(node->children[0], offset);
 		fnode.second_child = flatten_tree(node->children[1], offset);
+		flat_nodes[first_child].sibling = fnode.second_child;
+		flat_nodes[fnode.second_child].sibling = first_child;
+		flat_nodes[first_child].parent = node_offset;
+		flat_nodes[fnode.second_child].parent = node_offset;
 	}
 	return node_offset;
 }
