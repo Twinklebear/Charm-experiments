@@ -18,6 +18,7 @@
 #include "light.h"
 #include "brdf.h"
 #include "bvh.h"
+#include "distributed_region.h"
 
 #include "stb_image.h"
 #include "stb_image_write.h"

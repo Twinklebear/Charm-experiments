@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 #include "ray.h"
 #include "bbox.h"
+#include "distributed_region.h"
 #include "geometry.h"
 #include "diff_geom.h"
 
@@ -29,7 +30,7 @@ class BVH {
 
 	// Node used when constructing the BVH tree
 	struct BuildNode {
-		// Node's children, null if a leaf node. TODO: Also track sibling and parent
+		// Node's children, null if a leaf node
 		std::array<std::unique_ptr<BuildNode>, 2> children;
 		/* Offset to the first geometry in this node and # of geometry in it
 		 * ngeom = 0 if this is an interior node
@@ -52,7 +53,6 @@ class BVH {
 	 */
 	struct FlatNode {
 		BBox bounds;
-		// TODO: Store sibling and parent info as well
 		union {
 			// Used for leaves to locate geometry
 			size_t geom_offset;
@@ -68,8 +68,8 @@ class BVH {
 
 	// Max amount of geometry per leaf node
 	size_t max_geom;
-	// The geometry being stored in this BVH
-	std::vector<const Geometry*> geometry;
+	// The regions being stored in this BVH
+	std::vector<const DistributedRegion*> geometry;
 	// The final flatted BVH structure
 	std::vector<FlatNode> flat_nodes;
 
@@ -79,20 +79,22 @@ public:
 	 * can be stored per node, default is 128, max is 256
 	 * The defaults for the empty constructor will build an empty BVH
 	 */
-	BVH(const std::vector<const Geometry*> &geom = std::vector<const Geometry*>{},
-		size_t max_geom = 128);
+	BVH(const std::vector<const DistributedRegion*> &regions
+			= std::vector<const DistributedRegion*>{});
 	// Get the bounds for the BVH
 	BBox bounds() const;
-	// Perform an intersection test on the geometry stored in the BVH
-	bool intersect(Ray &ray, DifferentialGeometry &dg) const;
+	/* Intersect the regions in the BVH, resuming from the existing
+	 * traversal state passed. Returns the distributed region that
+	 * the ray should be sent to next, or nullptr if none.
+	 */
+	const DistributedRegion* intersect(const Ray &ray, size_t &current, size_t &bitstack) const;
+	/* Backtrack up the tree to find the next node we should test and update the stack,
+	 * returns false if the traversal is done.
+	 * TODO: This should be some state struct we take to prevent errors
+	 */
+	bool backtrack(size_t &current, size_t &bitstack) const;
 
 private:
-	// Standard stack-based traversal algorithm for the BVH
-	bool intersect_stack(Ray &ray, DifferentialGeometry &dg) const;
-	/* Implementation of Afra & Szirmay-Kalos stackless traversal,
-	 * see the paper "Stackless Multi-BVH Traversal for CPU, MIC and GPU Ray Tracing"
-	 */
-	bool intersect_stackless(Ray &ray, DifferentialGeometry &dg) const;
 	/* Construct a subtree of the BVH for the build_geom from [start, end)
 	 * and return the root of this subtree. The geometry is placed in the child
 	 * nodes is partitioned into ordered geom for easier look up later
@@ -100,13 +102,13 @@ private:
 	 * the BVH
 	 */
 	std::unique_ptr<BuildNode> build(std::vector<GeomInfo> &build_geom,
-			std::vector<const Geometry*> &ordered_geom, size_t start, size_t end,
-			size_t &total_nodes);
+			std::vector<const DistributedRegion*> &ordered_geom,
+			size_t start, size_t end, size_t &total_nodes);
 	/* Build a leaf node in the tree using the geometry passed and push the ordered geometry for the
 	 * leaf into ordered_geom
 	 */
 	std::unique_ptr<BuildNode> build_leaf(std::vector<GeomInfo> &build_geom,
-			std::vector<const Geometry*> &ordered_geom,
+			std::vector<const DistributedRegion*> &ordered_geom,
 			size_t start, size_t end, const BBox &box);
 	/* Recursively flatten the BVH tree into the flat nodes vector
 	 * offset tracks the current offset into the flat nodes vector

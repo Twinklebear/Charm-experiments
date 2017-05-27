@@ -28,9 +28,7 @@ BVH::BuildNode::BuildNode(int split, std::unique_ptr<BuildNode> a, std::unique_p
 	bounds.box_union(children[1]->bounds);
 }
 
-BVH::BVH(const std::vector<const Geometry*> &geom, size_t max_geom)
-	: max_geom(std::min(size_t(256), max_geom)), geometry(geom)
-{
+BVH::BVH(const std::vector<const DistributedRegion*> &regions) : max_geom(1), geometry(regions) {
 	// If we didn't get any geometry to partition then we don't have to do anything
 	if (geometry.empty()) {
 		return;
@@ -39,10 +37,10 @@ BVH::BVH(const std::vector<const Geometry*> &geom, size_t max_geom)
 	std::vector<GeomInfo> build_geom;
 	build_geom.reserve(geometry.size());
 	for (size_t i = 0; i < geometry.size(); ++i){
-		build_geom.emplace_back(i, geometry[i]->bounds());
+		build_geom.emplace_back(i, regions[i]->bounds);
 	}
 
-	std::vector<const Geometry*> ordered_geom;
+	std::vector<const DistributedRegion*> ordered_geom;
 	ordered_geom.reserve(geometry.size());
 	size_t total_nodes = 0;
 	std::unique_ptr<BuildNode> root = build(build_geom, ordered_geom, 0, geometry.size(), total_nodes);
@@ -58,69 +56,18 @@ BVH::BVH(const std::vector<const Geometry*> &geom, size_t max_geom)
 BBox BVH::bounds() const {
 	return !flat_nodes.empty() ? flat_nodes[0].bounds : BBox{};
 }
-bool BVH::intersect(Ray &r, DifferentialGeometry &dg) const {
-	if (flat_nodes.empty()){
-		return false;
-	}
-	return intersect_stackless(r, dg);
-}
-bool BVH::intersect_stack(Ray &r, DifferentialGeometry &dg) const {
-	bool hit = false;
+const DistributedRegion* BVH::intersect(const Ray &r, size_t &current, size_t &bitstack) const {
 	const glm::vec3 inv_dir = glm::vec3(1.f) / r.dir;
 	const std::array<int, 3> neg_dir = {inv_dir.x < 0, inv_dir.y < 0, inv_dir.z < 0};
-	std::array<size_t, 64> todo;
-	size_t todo_offset = 0, current = 0;
 	while (true) {
+		// TODO: The indices 'current' and so on will not be portable across nodes!
+		// At least, not if they don't all build the exact same BVH. Can we ensure
+		// that if we are sure that they all have the DistributedRegions in the
+		// same order when they build though?
 		const FlatNode &fnode = flat_nodes[current];
-		if (fnode.bounds.fast_intersect(r, inv_dir, neg_dir)) {
-			//If it's a leaf node check the geometry
-			if (fnode.ngeom > 0) {
-				for (uint32_t i = 0; i < fnode.ngeom; ++i) {
-					if (geometry[fnode.geom_offset + i]->intersect(r, dg)){
-						hit = true;
-					}
-				}
-				if (todo_offset == 0) {
-					break;
-				}
-				current = todo[--todo_offset];
-			} else {
-				// If it's an interior node we move to the near one and push the far one on the stack
-				// Figure out which node is further along the ray and push it onto the stack
-				// and traverse the nearer one
-				if (neg_dir[fnode.axis]) {
-					todo[todo_offset++] = current + 1;
-					current = fnode.second_child;
-				} else {
-					todo[todo_offset++] = fnode.second_child;
-					++current;
-				}
-			}
-		} else {
-			//If we've checked everything on our list we're done
-			if (todo_offset == 0) {
-				break;
-			}
-			current = todo[--todo_offset];
-		}
-	}
-	return hit;
-}
-bool BVH::intersect_stackless(Ray &r, DifferentialGeometry &dg) const {
-	const glm::vec3 inv_dir = glm::vec3(1.f) / r.dir;
-	const std::array<int, 3> neg_dir = {inv_dir.x < 0, inv_dir.y < 0, inv_dir.z < 0};
-	size_t current = 0;
-	size_t bitstack = 0;
-	bool hit = false;
-	while (true) {
-		const FlatNode &fnode = flat_nodes[current];
-		// If it's a leaf node check the geometry
+		// If it's a leaf node we need to send the ray to the owner of the region
 		if (fnode.ngeom > 0) {
-			for (uint32_t i = 0; i < fnode.ngeom; ++i) {
-				if (geometry[fnode.geom_offset + i]->intersect(r, dg)) {
-					hit = true;
-				}
-			}
+			return geometry[fnode.geom_offset];
 		} else {
 			// Check which (if any) children we hit
 			const std::array<bool, 2> child_hits{
@@ -145,21 +92,27 @@ bool BVH::intersect_stackless(Ray &r, DifferentialGeometry &dg) const {
 				continue;
 			}
 		}
-		// Backtracking up the stack to the next node we should traverse
-		while ((bitstack & 1) == 0) {
-			if (!bitstack) {
-				return hit;
-			}
-			current = flat_nodes[current].parent;
-			bitstack = bitstack >> 1;
+		if (!backtrack(current, bitstack)) {
+			return nullptr;
 		}
-		current = flat_nodes[current].sibling;
-		bitstack = bitstack ^ 1;
 	}
-	return hit;
+	return nullptr;
+}
+bool BVH::backtrack(size_t &current, size_t &bitstack) const {
+	while ((bitstack & 1) == 0) {
+		if (!bitstack) {
+			return false;
+		}
+		current = flat_nodes[current].parent;
+		bitstack = bitstack >> 1;
+	}
+	current = flat_nodes[current].sibling;
+	bitstack = bitstack ^ 1;
+	return true;
 }
 std::unique_ptr<BVH::BuildNode> BVH::build(std::vector<GeomInfo> &build_geom,
-		std::vector<const Geometry*> &ordered_geom, size_t start, size_t end, size_t &total_nodes)
+		std::vector<const DistributedRegion*> &ordered_geom, size_t start,
+		size_t end, size_t &total_nodes)
 {
 	++total_nodes;
 	// Find total bounds for the geometry we're trying to store
@@ -256,7 +209,8 @@ std::unique_ptr<BVH::BuildNode> BVH::build(std::vector<GeomInfo> &build_geom,
 		build(build_geom, ordered_geom, mid, end, total_nodes));
 }
 std::unique_ptr<BVH::BuildNode> BVH::build_leaf(std::vector<GeomInfo> &build_geom,
-		std::vector<const Geometry*> &ordered_geom, size_t start, size_t end, const BBox &box)
+		std::vector<const DistributedRegion*> &ordered_geom,
+		size_t start, size_t end, const BBox &box)
 {
 	const size_t ngeom = end - start;
 	// Store the offset to this leaf's geometry then push it on
