@@ -54,6 +54,7 @@ Region::Region() : rng(std::random_device()()), bounds_received(0) {
 		my_object = std::make_shared<pt::Plane>(glm::vec3(0, 0, -2), glm::vec3(0, 0, 1), 2.5, lambertian_white);
 	}
 	other_bounds.resize(NUM_REGIONS);
+	world.resize(NUM_REGIONS);
 }
 Region::Region(CkMigrateMessage *msg) : rng(std::random_device()()), bounds_received(0) {
 	CkPrintf("Region doesn't support migration!\n");
@@ -79,10 +80,16 @@ void Region::load() {
 }
 void Region::send_bounds(BoundsMessage *msg) {
 	other_bounds[msg->id] = msg->bounds;
+	world[msg->id] = pt::DistributedRegion(msg->bounds, msg->id);
 
 	delete msg;
 	++bounds_received;
 	if (bounds_received == NUM_REGIONS - 1) {
+		world[thisIndex] = pt::DistributedRegion(my_object->bounds(), thisIndex);
+		std::vector<const pt::DistributedRegion*> world_ptrs;
+		std::transform(world.begin(), world.end(), std::back_inserter(world_ptrs),
+				[](const pt::DistributedRegion &a) { return &a; });
+		bvh = pt::BVH(world_ptrs);
 		main_proxy.region_loaded();
 	}
 }
@@ -155,24 +162,39 @@ void Region::send_ray(SendRayMessage *msg) {
 	// or at least keep the scene alive, since the Region may have multiple geometry
 	pt::HitIntegrator integrator(pt::Scene({my_object}, {}));
 	glm::vec3 color = integrator.integrate(msg->ray);
-	// If the ray misses us too, send it along. TODO: We need to determine who is actually
-	// the next node to send the ray too based on where it's been previously.
-	if (color == glm::vec3(0)) {
-		color = glm::vec3(0.1);
+
+	if (color != glm::vec3(0)) {
+		// Tag the tiles based on who owns them
+		switch (thisIndex) {
+			case 0: color *= glm::vec3(1, 0, 0); break;
+			case 1: color *= glm::vec3(0, 1, 0); break;
+			case 2: color *= glm::vec3(0, 0, 1); break;
+			default: break;
+		}
+		thisProxy[msg->owner_id].report_ray(new RayResultMessage(glm::vec4(color, msg->ray.t_max),
+					msg->tile, msg->pixel));
+	} else {
+		// Backtrack in the BVH and ship the ray off to the next region it needs to
+		// traverse. If there is no next region send our result back
+		const pt::DistributedRegion *next = nullptr;
+		if (bvh.backtrack(msg->bvh_current, msg->bvh_bitstack)) {
+			next = bvh.intersect(msg->ray, msg->bvh_current, msg->bvh_bitstack);
+		}
+		if (next) {
+			thisProxy[next->owner].send_ray(new SendRayMessage(msg->owner_id, msg->tile,
+						msg->pixel, msg->ray, msg->bvh_current, msg->bvh_bitstack));
+		} else {
+			color = glm::vec3(0.1);
+			switch (thisIndex) {
+				case 0: color *= glm::vec3(1, 0, 0); break;
+				case 1: color *= glm::vec3(0, 1, 0); break;
+				case 2: color *= glm::vec3(0, 0, 1); break;
+				default: break;
+			}
+			thisProxy[msg->owner_id].report_ray(new RayResultMessage(glm::vec4(color, msg->ray.t_max),
+						msg->tile, msg->pixel));
+		}
 	}
-	// Tag the result based on who rendered it them
-	switch (thisIndex) {
-		case 0: color *= glm::vec3(1, 0, 0); break;
-		case 1: color *= glm::vec3(0, 1, 0); break;
-		case 2: color *= glm::vec3(0, 0, 1); break;
-		default: break;
-	}
-	// Send the result back
-	// TODO: We need to continue the ray on potentially, but must know its traversal
-	// state. Otherwise we might send the ray back to someone who previously traversed
-	// it and sent it to us, creating a loop.
-	thisProxy[msg->owner_id].report_ray(new RayResultMessage(glm::vec4(color, msg->ray.t_max),
-				msg->tile, msg->pixel));
 	delete msg;
 }
 void Region::report_ray(RayResultMessage *msg) {
@@ -208,42 +230,31 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 			const float py = i + start_y;
 			pt::Ray ray = camera.generate_ray(px, py, {real_distrib(ray_dir_rng), real_distrib(ray_dir_rng)});
 
-			// Am I the first region along this ray? If so, render the pixel, otherwise skip it since someone
-			// else owns the primary ray and will send it on to me if I need to continue it.
-			const glm::vec3 inv_dir = 1.f / ray.dir;
-			const std::array<int, 3> neg_dir = {ray.dir.x < 0 ? 1 : 0, ray.dir.y < 0 ? 1 : 0, ray.dir.z < 0 ? 1 : 0};
-			bool first_region = my_object->bounds().intersect(ray, inv_dir, neg_dir)
-				|| regions_in_tile.empty();
-			for (const auto &r : regions_in_tile) {
-				if (other_bounds[r].intersect(ray, inv_dir, neg_dir)) {
-					first_region = false;
-					break;
-				}
-			}
-			ray.t_max = std::numeric_limits<float>::infinity();
+			size_t bvh_current = 0;
+			size_t bvh_bitstack = 0;
+			const pt::DistributedRegion *first_region = bvh.intersect(ray, bvh_current, bvh_bitstack);
 
-			glm::vec3 color(0.1);
-			if (first_region) {
+			glm::vec3 color(0);
+			if (first_region && first_region->owner == thisIndex) {
 				// If we didn't hit anything, find the next region along the ray and send
 				// the ray to it for rendering
 				color = integrator.integrate(ray);
 				if (color == glm::vec3(0)) {
-					//color = glm::vec3(0.1);
-					uint64_t next = -1;
-					for (const auto &r : regions_in_tile) {
-						if (other_bounds[r].intersect(ray, inv_dir, neg_dir)) {
-							next = r;
-						}
+					// Backtrack in the BVH and ship the ray off to the next region it needs to
+					// traverse. If there is no next region, write the background color
+					const pt::DistributedRegion *next = nullptr;
+					if (bvh.backtrack(bvh_current, bvh_bitstack)) {
+						next = bvh.intersect(ray, bvh_current, bvh_bitstack);
 					}
-					ray.t_max = std::numeric_limits<float>::infinity();
-
-					// If no one else intersects this ray, we'll just write the background color
-					if (next < NUM_REGIONS) {
-						thisProxy[next].send_ray(new SendRayMessage(thisIndex, tile.msg->tile_id, i * TILE_W + j, ray));
+					if (next) {
+						thisProxy[next->owner].send_ray(new SendRayMessage(thisIndex, tile.msg->tile_id,
+									i * TILE_W + j, ray, bvh_current, bvh_bitstack));
 					} else {
 						color = glm::vec3(0.1);
 					}
 				}
+			} else {
+				color = glm::vec3(0.1);
 			}
 			if (color != glm::vec3(0)) {
 				// Tag the tiles based on who owns them
@@ -325,14 +336,18 @@ TileCompleteMessage* TileCompleteMessage::unpack(void *buf) {
 }
 
 SendRayMessage::SendRayMessage() : ray(glm::vec3(NAN), glm::vec3(NAN)) {}
-SendRayMessage::SendRayMessage(uint64_t owner_id, uint64_t tile, uint64_t pixel, const pt::Ray &ray)
-	: owner_id(owner_id), tile(tile), pixel(pixel), ray(ray)
+SendRayMessage::SendRayMessage(uint64_t owner_id, uint64_t tile, uint64_t pixel,
+		const pt::Ray &ray, uint64_t bvh_current, uint64_t bvh_bitstack)
+	: owner_id(owner_id), tile(tile), pixel(pixel), ray(ray), bvh_current(bvh_current),
+	bvh_bitstack(bvh_bitstack)
 {}
 void SendRayMessage::msg_pup(PUP::er &p) {
 	p | owner_id;
 	p | tile;
 	p | pixel;
 	p | ray;
+	p | bvh_current;
+	p | bvh_bitstack;
 }
 
 RayResultMessage::RayResultMessage() {}

@@ -50,6 +50,8 @@ class Region : public CBase_Region {
 	std::shared_ptr<pt::Geometry> my_object;
 	// TODO: We need to serialize this if the chare migrates
 	std::vector<pt::BBox> other_bounds, other_screen_bounds;
+	std::vector<pt::DistributedRegion> world;
+	pt::BVH bvh;
 	// Tile's we're actively rendering or waiting for results back from
 	// other nodes to complete rendering.
 	std::unordered_map<size_t, RenderingTile> rendering_tiles;
@@ -127,8 +129,10 @@ public:
 	// Should convert renderer to a stream system and send sorted
 	// SoA ray groups which we compress w/ ZFP.
 	pt::Ray ray;
+	uint64_t bvh_current, bvh_bitstack;
 
-	SendRayMessage(uint64_t owner_id, uint64_t tile, uint64_t pixel, const pt::Ray &ray);
+	SendRayMessage(uint64_t owner_id, uint64_t tile, uint64_t pixel, const pt::Ray &ray,
+			uint64_t bvh_current, uint64_t bvh_bitstack);
 	void msg_pup(PUP::er &p);
 };
 
