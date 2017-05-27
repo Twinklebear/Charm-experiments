@@ -21,6 +21,8 @@ glm::vec3 WhittedIntegrator::integrate(Ray &ray) const {
 				const glm::vec3 w_i = dg.to_shading(light_sample.dir);
 
 				// TODO: Should detect transmission vs. reflection case and request appropriate brdf
+				// TODO: Doing this occlusion test needs to potentially ship a ray off to other nodes,
+				// who will then be responsible for shading it and sending the color back to the owner.
 				if (glm::dot(light_sample.dir, dg.normal) > 0.0 && !light_sample.occluded(scene)) {
 					// note: no division by pdf since it's 1 for the delta light
 					lighting += dg.brdf->eval(w_i, w_o) * light_sample.illum

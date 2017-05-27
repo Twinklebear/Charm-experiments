@@ -348,6 +348,8 @@ void SendRayMessage::msg_pup(PUP::er &p) {
 	p | traversal.bitstack;
 }
 
+ShadowRayMessage::ShadowRayMessage() : ray(glm::vec3(NAN), glm::vec3(NAN)) {}
+
 RayResultMessage::RayResultMessage() {}
 RayResultMessage::RayResultMessage(const glm::vec4 &result, uint64_t tile, uint64_t pixel)
 	: result(result), tile(tile), pixel(pixel)

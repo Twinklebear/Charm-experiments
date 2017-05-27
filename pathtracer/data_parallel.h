@@ -136,6 +136,22 @@ public:
 	void msg_pup(PUP::er &p);
 };
 
+class ShadowRayMessage : public CMessage_ShadowRayMessage {
+	ShadowRayMessage();
+
+public:
+	uint64_t owner_id, tile, pixel;
+	// Partial shading is the color we're accumulating into for this pixel,
+	// while surface color is the current surface being shaded, to be multiplied
+	// with the light color if it's not occluded.
+	glm::vec3 partial_shading, surface_color;
+	// TODO: Packets or larger chunks of rays, compression.
+	// Should convert renderer to a stream system and send sorted
+	// SoA ray groups which we compress w/ ZFP.
+	pt::Ray ray;
+	pt::BVHTraversalState traversal;
+};
+
 class RayResultMessage : public CMessage_RayResultMessage {
 	RayResultMessage();
 
