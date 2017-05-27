@@ -90,7 +90,7 @@ private:
 	// Standard stack-based traversal algorithm for the BVH
 	bool intersect_stack(Ray &ray, DifferentialGeometry &dg) const;
 	/* Implementation of Afra & Szirmay-Kalos stackless traversal,
-	 * see the paper 'Stackless Multi-BVH Traversal for CPU, MIC and GPU Ray Tracing'
+	 * see the paper "Stackless Multi-BVH Traversal for CPU, MIC and GPU Ray Tracing"
 	 */
 	bool intersect_stackless(Ray &ray, DifferentialGeometry &dg) const;
 	/* Construct a subtree of the BVH for the build_geom from [start, end)

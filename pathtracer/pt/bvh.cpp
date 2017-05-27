@@ -187,7 +187,7 @@ std::unique_ptr<BVH::BuildNode> BVH::build(std::vector<GeomInfo> &build_geom,
 	if (centroids.max[axis] == centroids.min[axis]){
 		// Check that we can fit all the geometry into a single leaf node, if not we need
 		// to force a split
-		if (ngeom < max_geom) {
+		if (ngeom <= max_geom) {
 			return build_leaf(build_geom, ordered_geom, start, end, box);
 		} else {
 			return std::make_unique<BuildNode>(axis,
