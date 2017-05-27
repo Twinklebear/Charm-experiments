@@ -12,6 +12,13 @@
 
 namespace pt {
 
+struct BVHTraversalState {
+	size_t current;
+	size_t bitstack;
+
+	BVHTraversalState();
+};
+
 /* A BVH2 built off of the one introduced in PBR and modified to
  * use Afta and Szirmay-Kalos's stackless traversal algorithm from
  * "Stackless Multi-BVH Traversal for CPU, MIC and GPU Ray Tracing"
@@ -87,12 +94,12 @@ public:
 	 * traversal state passed. Returns the distributed region that
 	 * the ray should be sent to next, or nullptr if none.
 	 */
-	const DistributedRegion* intersect(const Ray &ray, size_t &current, size_t &bitstack) const;
+	const DistributedRegion* intersect(const Ray &ray, BVHTraversalState &state) const;
 	/* Backtrack up the tree to find the next node we should test and update the stack,
 	 * returns false if the traversal is done.
 	 * TODO: This should be some state struct we take to prevent errors
 	 */
-	bool backtrack(size_t &current, size_t &bitstack) const;
+	bool backtrack(BVHTraversalState &state) const;
 
 private:
 	/* Construct a subtree of the BVH for the build_geom from [start, end)

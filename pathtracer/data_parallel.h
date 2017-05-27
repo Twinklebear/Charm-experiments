@@ -129,10 +129,10 @@ public:
 	// Should convert renderer to a stream system and send sorted
 	// SoA ray groups which we compress w/ ZFP.
 	pt::Ray ray;
-	uint64_t bvh_current, bvh_bitstack;
+	pt::BVHTraversalState traversal;
 
 	SendRayMessage(uint64_t owner_id, uint64_t tile, uint64_t pixel, const pt::Ray &ray,
-			uint64_t bvh_current, uint64_t bvh_bitstack);
+			pt::BVHTraversalState traversal);
 	void msg_pup(PUP::er &p);
 };
 

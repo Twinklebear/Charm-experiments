@@ -177,12 +177,12 @@ void Region::send_ray(SendRayMessage *msg) {
 		// Backtrack in the BVH and ship the ray off to the next region it needs to
 		// traverse. If there is no next region send our result back
 		const pt::DistributedRegion *next = nullptr;
-		if (bvh.backtrack(msg->bvh_current, msg->bvh_bitstack)) {
-			next = bvh.intersect(msg->ray, msg->bvh_current, msg->bvh_bitstack);
+		if (bvh.backtrack(msg->traversal)) {
+			next = bvh.intersect(msg->ray, msg->traversal);
 		}
 		if (next) {
 			thisProxy[next->owner].send_ray(new SendRayMessage(msg->owner_id, msg->tile,
-						msg->pixel, msg->ray, msg->bvh_current, msg->bvh_bitstack));
+						msg->pixel, msg->ray, msg->traversal));
 		} else {
 			color = glm::vec3(0.1);
 			switch (thisIndex) {
@@ -230,9 +230,8 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 			const float py = i + start_y;
 			pt::Ray ray = camera.generate_ray(px, py, {real_distrib(ray_dir_rng), real_distrib(ray_dir_rng)});
 
-			size_t bvh_current = 0;
-			size_t bvh_bitstack = 0;
-			const pt::DistributedRegion *first_region = bvh.intersect(ray, bvh_current, bvh_bitstack);
+			pt::BVHTraversalState traversal;
+			const pt::DistributedRegion *first_region = bvh.intersect(ray, traversal);
 
 			glm::vec3 color(0);
 			if (first_region && first_region->owner == thisIndex) {
@@ -243,12 +242,12 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 					// Backtrack in the BVH and ship the ray off to the next region it needs to
 					// traverse. If there is no next region, write the background color
 					const pt::DistributedRegion *next = nullptr;
-					if (bvh.backtrack(bvh_current, bvh_bitstack)) {
-						next = bvh.intersect(ray, bvh_current, bvh_bitstack);
+					if (bvh.backtrack(traversal)) {
+						next = bvh.intersect(ray, traversal);
 					}
 					if (next) {
 						thisProxy[next->owner].send_ray(new SendRayMessage(thisIndex, tile.msg->tile_id,
-									i * TILE_W + j, ray, bvh_current, bvh_bitstack));
+									i * TILE_W + j, ray, traversal));
 					} else {
 						color = glm::vec3(0.1);
 					}
@@ -337,17 +336,16 @@ TileCompleteMessage* TileCompleteMessage::unpack(void *buf) {
 
 SendRayMessage::SendRayMessage() : ray(glm::vec3(NAN), glm::vec3(NAN)) {}
 SendRayMessage::SendRayMessage(uint64_t owner_id, uint64_t tile, uint64_t pixel,
-		const pt::Ray &ray, uint64_t bvh_current, uint64_t bvh_bitstack)
-	: owner_id(owner_id), tile(tile), pixel(pixel), ray(ray), bvh_current(bvh_current),
-	bvh_bitstack(bvh_bitstack)
+		const pt::Ray &ray, pt::BVHTraversalState traversal)
+	: owner_id(owner_id), tile(tile), pixel(pixel), ray(ray), traversal(traversal)
 {}
 void SendRayMessage::msg_pup(PUP::er &p) {
 	p | owner_id;
 	p | tile;
 	p | pixel;
 	p | ray;
-	p | bvh_current;
-	p | bvh_bitstack;
+	p | traversal.current;
+	p | traversal.bitstack;
 }
 
 RayResultMessage::RayResultMessage() {}

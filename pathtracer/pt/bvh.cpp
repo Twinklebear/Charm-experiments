@@ -8,6 +8,8 @@
 
 namespace pt {
 
+BVHTraversalState::BVHTraversalState() : current(0), bitstack(0) {}
+
 // Bucket used for SAH split method
 struct SAHBucket {
 	size_t count;
@@ -56,7 +58,7 @@ BVH::BVH(const std::vector<const DistributedRegion*> &regions) : max_geom(1), ge
 BBox BVH::bounds() const {
 	return !flat_nodes.empty() ? flat_nodes[0].bounds : BBox{};
 }
-const DistributedRegion* BVH::intersect(const Ray &r, size_t &current, size_t &bitstack) const {
+const DistributedRegion* BVH::intersect(const Ray &r, BVHTraversalState &state) const {
 	const glm::vec3 inv_dir = glm::vec3(1.f) / r.dir;
 	const std::array<int, 3> neg_dir = {inv_dir.x < 0, inv_dir.y < 0, inv_dir.z < 0};
 	while (true) {
@@ -64,50 +66,50 @@ const DistributedRegion* BVH::intersect(const Ray &r, size_t &current, size_t &b
 		// At least, not if they don't all build the exact same BVH. Can we ensure
 		// that if we are sure that they all have the DistributedRegions in the
 		// same order when they build though?
-		const FlatNode &fnode = flat_nodes[current];
+		const FlatNode &fnode = flat_nodes[state.current];
 		// If it's a leaf node we need to send the ray to the owner of the region
 		if (fnode.ngeom > 0) {
 			return geometry[fnode.geom_offset];
 		} else {
 			// Check which (if any) children we hit
 			const std::array<bool, 2> child_hits{
-				flat_nodes[current + 1].bounds.fast_intersect(r, inv_dir, neg_dir),
+				flat_nodes[state.current + 1].bounds.fast_intersect(r, inv_dir, neg_dir),
 				flat_nodes[fnode.second_child].bounds.fast_intersect(r, inv_dir, neg_dir)
 			};
 			if (child_hits[0] || child_hits[1]) {
-				bitstack = bitstack << 1;
+				state.bitstack = state.bitstack << 1;
 				// If we hit both children enter the nearer one and push a 1 onto the stack
 				if (child_hits[0] && child_hits[1]) {
-					bitstack = bitstack | 1;
+					state.bitstack = state.bitstack | 1;
 					if (neg_dir[fnode.axis]) {
-						current = fnode.second_child;
+						state.current = fnode.second_child;
 					} else {
-						++current;
+						++state.current;
 					}
 				} else if (child_hits[0]) {
-					++current;
+					++state.current;
 				} else {
-					current = fnode.second_child;
+					state.current = fnode.second_child;
 				}
 				continue;
 			}
 		}
-		if (!backtrack(current, bitstack)) {
+		if (!backtrack(state)) {
 			return nullptr;
 		}
 	}
 	return nullptr;
 }
-bool BVH::backtrack(size_t &current, size_t &bitstack) const {
-	while ((bitstack & 1) == 0) {
-		if (!bitstack) {
+bool BVH::backtrack(BVHTraversalState &state) const {
+	while ((state.bitstack & 1) == 0) {
+		if (!state.bitstack) {
 			return false;
 		}
-		current = flat_nodes[current].parent;
-		bitstack = bitstack >> 1;
+		state.current = flat_nodes[state.current].parent;
+		state.bitstack = state.bitstack >> 1;
 	}
-	current = flat_nodes[current].sibling;
-	bitstack = bitstack ^ 1;
+	state.current = flat_nodes[state.current].sibling;
+	state.bitstack = state.bitstack ^ 1;
 	return true;
 }
 std::unique_ptr<BVH::BuildNode> BVH::build(std::vector<GeomInfo> &build_geom,
