@@ -5,7 +5,6 @@
 #include "ray.h"
 #include "diff_geom.h"
 #include "geometry.h"
-#include "bvh.h"
 
 namespace pt {
 
@@ -15,7 +14,6 @@ class Light;
 struct Scene {
 	std::vector<std::shared_ptr<Geometry>> geometry;
 	std::vector<std::shared_ptr<Light>> lights;
-	BVH bvh;
 
 	Scene(std::vector<std::shared_ptr<Geometry>> geom, std::vector<std::shared_ptr<Light>> lights);
 	// Find the object hit by the ray in the scene

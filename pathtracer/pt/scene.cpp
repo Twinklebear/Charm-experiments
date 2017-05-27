@@ -6,14 +6,20 @@ namespace pt {
 
 Scene::Scene(std::vector<std::shared_ptr<Geometry>> geom, std::vector<std::shared_ptr<Light>> lights)
 	: geometry(geom), lights(lights)
-{
-	std::vector<const Geometry*> g;
-	std::transform(geometry.begin(), geometry.end(), std::back_inserter(g),
-			[](std::shared_ptr<Geometry> &x) { return x.get(); });
-	bvh = BVH(g, 1);
-}
+{}
 bool Scene::intersect(Ray &ray, DifferentialGeometry &dg) const {
-	return bvh.intersect(ray, dg);
+	const glm::vec3 inv_dir = 1.f / ray.dir;
+	const std::array<int, 3> neg_dir{ray.dir.x < 0 ? 1 : 0,
+		ray.dir.y < 0 ? 1 : 0, ray.dir.z < 0 ? 1 : 0
+	};
+	return std::accumulate(geometry.begin(), geometry.end(), false,
+		[&](const bool &hit, const std::shared_ptr<Geometry> &g) {
+			if (g->bounds().fast_intersect(ray, inv_dir, neg_dir)) {
+				return g->intersect(ray, dg) || hit;
+			} else {
+				return hit;
+			}
+		});
 }
 
 }
