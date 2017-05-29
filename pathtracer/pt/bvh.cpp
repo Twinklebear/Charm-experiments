@@ -69,7 +69,9 @@ const DistributedRegion* BVH::intersect(const Ray &r, BVHTraversalState &state) 
 		const FlatNode &fnode = flat_nodes[state.current];
 		// If it's a leaf node we need to send the ray to the owner of the region
 		if (fnode.ngeom > 0) {
-			return geometry[fnode.geom_offset];
+			if (fnode.bounds.fast_intersect(r, inv_dir, neg_dir)) {
+				return geometry[fnode.geom_offset];
+			}
 		} else {
 			// Check which (if any) children we hit
 			const std::array<bool, 2> child_hits{
