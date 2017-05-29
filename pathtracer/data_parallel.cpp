@@ -82,12 +82,12 @@ void Region::load() {
 }
 void Region::send_bounds(BoundsMessage *msg) {
 	other_bounds[msg->id] = msg->bounds;
-	world[msg->id] = pt::DistributedRegion(msg->bounds, msg->id);
+	world[msg->id] = pt::DistributedRegion(msg->bounds, msg->id, false);
 
 	delete msg;
 	++bounds_received;
 	if (bounds_received == NUM_REGIONS - 1) {
-		world[thisIndex] = pt::DistributedRegion(my_object->bounds(), thisIndex);
+		world[thisIndex] = pt::DistributedRegion(my_object->bounds(), thisIndex, true);
 		std::vector<const pt::DistributedRegion*> world_ptrs;
 		std::transform(world.begin(), world.end(), std::back_inserter(world_ptrs),
 				[](const pt::DistributedRegion &a) { return &a; });
@@ -167,7 +167,8 @@ void Region::send_ray(SendRayMessage *msg) {
 		pt::Scene({my_object},
 			{
 				std::make_shared<pt::PointLight>(glm::vec3(-0.1, 0.5, 2), glm::vec3(2)),
-			}
+			},
+			&bvh
 		));
 	const glm::vec3 color = integrator.integrate(msg->ray);
 
@@ -208,7 +209,8 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 		pt::Scene({my_object},
 			{
 				std::make_shared<pt::PointLight>(glm::vec3(-0.1, 0.5, 2), glm::vec3(2)),
-			}
+			},
+			&bvh
 		));
 	// We use a separate rng for primary ray directions so
 	// that all regions will see the same ray directions for
@@ -226,7 +228,7 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 			pt::BVHTraversalState traversal;
 			const pt::DistributedRegion *first_region = bvh.intersect(ray, traversal);
 
-			if (first_region && first_region->owner == thisIndex) {
+			if (first_region && first_region->is_mine) {
 				// If we didn't hit anything, find the next region along the ray and send
 				// the ray to it for rendering
 				const glm::vec3 color = integrator.integrate(ray);

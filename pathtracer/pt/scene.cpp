@@ -4,8 +4,9 @@
 
 namespace pt {
 
-Scene::Scene(std::vector<std::shared_ptr<Geometry>> geom, std::vector<std::shared_ptr<Light>> lights)
-	: geometry(geom), lights(lights)
+Scene::Scene(std::vector<std::shared_ptr<Geometry>> geom, std::vector<std::shared_ptr<Light>> lights,
+		const BVH *bvh)
+	: geometry(geom), lights(lights), bvh(bvh)
 {}
 bool Scene::intersect(Ray &ray, DifferentialGeometry &dg) const {
 	const glm::vec3 inv_dir = 1.f / ray.dir;
