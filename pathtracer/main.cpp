@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <utility>
 #include <algorithm>
 #include <cstring>
@@ -50,6 +51,7 @@ Main::Main(CkArgMsg *msg) : done_count(0), spp(1), samples_taken(0) {
 	// Set some default image dimensions
 	TILE_W = 32;
 	TILE_H = 32;
+	NUM_REGIONS = 3;
 	// Number of tiles along each dimension
 	uint64_t tiles_x = 10;
 	uint64_t tiles_y = 10;
@@ -81,6 +83,8 @@ Main::Main(CkArgMsg *msg) : done_count(0), spp(1), samples_taken(0) {
 				cam_up.z = std::atof(msg->argv[++i]);
 			} else if (std::strcmp("--spp", msg->argv[i]) == 0) {
 				spp = std::atoi(msg->argv[++i]);
+			} else if (std::strcmp("--nr", msg->argv[i]) == 0) {
+				NUM_REGIONS = std::atoi(msg->argv[++i]);
 			}
 		}
 	}
@@ -100,7 +104,6 @@ Main::Main(CkArgMsg *msg) : done_count(0), spp(1), samples_taken(0) {
 		start_pass = start_render = std::chrono::high_resolution_clock::now();
 		img_tiles.render();
 	} else {
-		NUM_REGIONS = 3;
 		CkPrintf("Experimental data parallel testing code with %lu regions\n", NUM_REGIONS);
 		regions = CProxy_Region::ckNew(NUM_REGIONS);
 		region_tiles.resize(num_tiles);
