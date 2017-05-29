@@ -18,11 +18,13 @@ extern uint64_t TILE_W;
 extern uint64_t TILE_H;
 extern uint64_t NUM_REGIONS;
 
-RenderingTile::RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const int64_t num_other_tiles)
-	: msg(new TileCompleteMessage(tile_x, tile_y, num_other_tiles)), results_expected(TILE_W * TILE_H, 1)
+RenderingTile::RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const int64_t num_other_tiles,
+		const uint64_t charm_index)
+	: msg(new TileCompleteMessage(tile_x, tile_y, num_other_tiles)), results_expected(TILE_W * TILE_H, 1),
+	charm_index(charm_index)
 {}
 void RenderingTile::report(const uint64_t x, const uint64_t y, const glm::vec4 &result) {
-	const size_t tx = x * TILE_W + y;
+	const size_t tx = y * TILE_W + x;
 	report(tx, result);
 }
 void RenderingTile::report(const uint64_t px, const glm::vec4 &result) {
@@ -44,14 +46,14 @@ bool RenderingTile::complete() const {
 
 Region::Region() : rng(std::random_device()()), bounds_received(0) {
 	if (thisIndex == 0) {
-		std::shared_ptr<pt::BxDF> lambertian_blue = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
-		my_object = std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, lambertian_blue);
+		std::shared_ptr<pt::BxDF> lambertian_red = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
+		my_object = std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, lambertian_red);
 	} else if (thisIndex == 1) {
 		std::shared_ptr<pt::BxDF> lambertian_blue = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
 		my_object = std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.7, 1.0), 0.25, lambertian_blue);
 	} else {
-		std::shared_ptr<pt::BxDF> lambertian_white = std::make_shared<pt::Lambertian>(glm::vec3(0.8));
-		my_object = std::make_shared<pt::Plane>(glm::vec3(0, 0, -2), glm::vec3(0, 0, 1), 2.5, lambertian_white);
+		std::shared_ptr<pt::BxDF> lambertian_white = std::make_shared<pt::Lambertian>(glm::vec3(0.9));
+		my_object = std::make_shared<pt::Plane>(glm::vec3(0, 0, -1.5), glm::vec3(0, 0, 1), 6, lambertian_white);
 	}
 	other_bounds.resize(NUM_REGIONS);
 	world.resize(NUM_REGIONS);
@@ -142,16 +144,17 @@ void Region::render() {
 			// TODO: If I'm not first for any pixel on this tile, I shouldn't send the
 			// final tile at all.
 			if (touches_tile(start_x, start_y, screen_bounds)) {
-				auto it = rendering_tiles.emplace(tid, RenderingTile(tx, ty, other_regions + 1));
-				render_tile(it.first->second, tx * TILE_W, ty * TILE_H, regions_in_tile);
+				regions_in_tile.insert(thisIndex);
+				auto it = rendering_tiles.emplace(tid, RenderingTile(tx, ty, other_regions + 1, thisIndex));
+				render_tile(it.first->second, tx * TILE_W, ty * TILE_H, tid, regions_in_tile);
 				if (it.first->second.complete()) {
 					main_proxy.tile_done(it.first->second.msg);
 				}
 			} else if (other_regions == 0 && tid % NUM_REGIONS == thisIndex) {
 				// It's our job to fill the tile with background color from the renderer,
 				// since no data projects to this tile.
-				RenderingTile tile(tx, ty, 1);
-				render_tile(tile, tx * TILE_W, ty * TILE_H, regions_in_tile);
+				RenderingTile tile(tx, ty, 1, thisIndex);
+				render_tile(tile, tx * TILE_W, ty * TILE_H, tid, regions_in_tile);
 				main_proxy.tile_done(tile.msg);
 			}
 		}
@@ -160,40 +163,26 @@ void Region::render() {
 void Region::send_ray(SendRayMessage *msg) {
 	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
 	// or at least keep the scene alive, since the Region may have multiple geometry
-	pt::HitIntegrator integrator(pt::Scene({my_object}, {}));
-	glm::vec3 color = integrator.integrate(msg->ray);
+	pt::WhittedIntegrator integrator(glm::vec3(0),
+		pt::Scene({my_object},
+			{
+				std::make_shared<pt::PointLight>(glm::vec3(-0.1, 0.5, 2), glm::vec3(2)),
+			}
+		));
+	const glm::vec3 color = integrator.integrate(msg->ray);
 
-	if (color != glm::vec3(0)) {
-		// Tag the tiles based on who owns them
-		switch (thisIndex) {
-			case 0: color *= glm::vec3(1, 0, 0); break;
-			case 1: color *= glm::vec3(0, 1, 0); break;
-			case 2: color *= glm::vec3(0, 0, 1); break;
-			default: break;
-		}
+	// Backtrack in the BVH and ship the ray off to the next region it needs to
+	// traverse, if there is no next region send our result back
+	const pt::DistributedRegion *next = nullptr;
+	if (bvh.backtrack(msg->traversal)) {
+		next = bvh.intersect(msg->ray, msg->traversal);
+	}
+	if (next) {
+		thisProxy[next->owner].send_ray(new SendRayMessage(msg->owner_id, msg->tile,
+					msg->pixel, msg->ray, msg->traversal));
+	} else {
 		thisProxy[msg->owner_id].report_ray(new RayResultMessage(glm::vec4(color, msg->ray.t_max),
 					msg->tile, msg->pixel));
-	} else {
-		// Backtrack in the BVH and ship the ray off to the next region it needs to
-		// traverse. If there is no next region send our result back
-		const pt::DistributedRegion *next = nullptr;
-		if (bvh.backtrack(msg->traversal)) {
-			next = bvh.intersect(msg->ray, msg->traversal);
-		}
-		if (next) {
-			thisProxy[next->owner].send_ray(new SendRayMessage(msg->owner_id, msg->tile,
-						msg->pixel, msg->ray, msg->traversal));
-		} else {
-			color = glm::vec3(0.1);
-			switch (thisIndex) {
-				case 0: color *= glm::vec3(1, 0, 0); break;
-				case 1: color *= glm::vec3(0, 1, 0); break;
-				case 2: color *= glm::vec3(0, 0, 1); break;
-				default: break;
-			}
-			thisProxy[msg->owner_id].report_ray(new RayResultMessage(glm::vec4(color, msg->ray.t_max),
-						msg->tile, msg->pixel));
-		}
 	}
 	delete msg;
 }
@@ -210,13 +199,17 @@ void Region::report_ray(RayResultMessage *msg) {
 	}
 }
 void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint64_t start_y,
-		const std::set<size_t> &regions_in_tile)
+		const uint64_t tile_id, const std::set<size_t> &regions_in_tile)
 {
 	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
 	// or at least keep the scene alive, since the Region may have multiple geometry
 	const pt::Camera camera(scene->cam_pos, scene->cam_target, scene->cam_up, 65.0, IMAGE_W, IMAGE_H);
-	pt::HitIntegrator integrator(pt::Scene({my_object}, {}));
-
+	pt::WhittedIntegrator integrator(glm::vec3(0),
+		pt::Scene({my_object},
+			{
+				std::make_shared<pt::PointLight>(glm::vec3(-0.1, 0.5, 2), glm::vec3(2)),
+			}
+		));
 	// We use a separate rng for primary ray directions so
 	// that all regions will see the same ray directions for
 	// each tile when testing who is first. TODO: in future send
@@ -233,37 +226,28 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 			pt::BVHTraversalState traversal;
 			const pt::DistributedRegion *first_region = bvh.intersect(ray, traversal);
 
-			glm::vec3 color(0);
 			if (first_region && first_region->owner == thisIndex) {
 				// If we didn't hit anything, find the next region along the ray and send
 				// the ray to it for rendering
-				color = integrator.integrate(ray);
-				if (color == glm::vec3(0)) {
-					// Backtrack in the BVH and ship the ray off to the next region it needs to
-					// traverse. If there is no next region, write the background color
-					const pt::DistributedRegion *next = nullptr;
-					if (bvh.backtrack(traversal)) {
-						next = bvh.intersect(ray, traversal);
-					}
-					if (next) {
-						thisProxy[next->owner].send_ray(new SendRayMessage(thisIndex, tile.msg->tile_id,
-									i * TILE_W + j, ray, traversal));
-					} else {
-						color = glm::vec3(0.1);
-					}
+				const glm::vec3 color = integrator.integrate(ray);
+				// Backtrack in the BVH and ship the ray off to the next region it needs to
+				// traverse. If there is no next region, write the background color
+				const pt::DistributedRegion *next = nullptr;
+				if (bvh.backtrack(traversal)) {
+					next = bvh.intersect(ray, traversal);
+				}
+				if (next) {
+					thisProxy[next->owner].send_ray(new SendRayMessage(thisIndex, tile.msg->tile_id,
+								i * TILE_W + j, ray, traversal));
+				} else {
+					tile.report(j, i, glm::vec4(color, ray.t_max));
 				}
 			} else {
-				color = glm::vec3(0.1);
-			}
-			if (color != glm::vec3(0)) {
-				// Tag the tiles based on who owns them
-				switch (thisIndex) {
-					case 0: color *= glm::vec3(1, 0, 0); break;
-					case 1: color *= glm::vec3(0, 1, 0); break;
-					case 2: color *= glm::vec3(0, 0, 1); break;
-					default: break;
-				}
-				tile.report(i, j, glm::vec4(color, ray.t_max));
+				// We don't own these pixels but still need to "finish" them on our local tile
+				// so we can see it as being completed. TODO: expose background color
+				// from the integrator so we don't have a hardcoded 0 background which
+				// may not match the scene background
+				tile.report(j, i, glm::vec4(0, 0, 0, ray.t_max));
 			}
 		}
 	}

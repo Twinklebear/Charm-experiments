@@ -28,9 +28,12 @@ struct RenderingTile {
 	// Count of how many results we're expecting back for each pixel in the tile.
 	// Once all entries are 0, this tile is finished.
 	std::vector<uint64_t> results_expected;
+	// For debugging, the index of the Charm++ region we're on
+	uint64_t charm_index;
 
 	// Construct a new rendering tile, will expect 1 result per pixel by default.
-	RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const int64_t num_other_tiles);
+	RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const int64_t num_other_tiles,
+			const uint64_t charm_index);
 	// Report a rendering result for some pixel in this tile, result = {R, G, B, Z}
 	void report(const uint64_t x, const uint64_t y, const glm::vec4 &result);
 	// Report a rendering result for some pixel in this tile, result = {R, G, B, Z}
@@ -79,7 +82,7 @@ public:
 private:
 	// Render a tile of the image to the tile passed
 	void render_tile(RenderingTile &tile, const uint64_t start_x, const uint64_t start_y,
-			const std::set<size_t> &regions_in_tile);
+			const uint64_t tile_id, const std::set<size_t> &regions_in_tile);
 	// Check if this region has data which projects to the tile
 	bool touches_tile(const uint64_t start_x, const uint64_t start_y, const pt::BBox &box) const;
 	// Project the passed bounding box to the screen
