@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ostream>
 #include <limits>
 #include <glm/glm.hpp>
 
@@ -16,4 +17,6 @@ struct Ray {
 };
 
 }
+
+std::ostream& operator<<(std::ostream &os, const pt::Ray &r);
 

@@ -117,8 +117,8 @@ struct BBox {
 }
 
 inline std::ostream& operator<<(std::ostream &os, const pt::BBox &b) {
-	os << "BBox { " << glm::to_string(b.min)
-		<< ", " << glm::to_string(b.max) << "\n";
+	os << "BBox {\n\tmin: " << glm::to_string(b.min)
+		<< ",\n\tmax: " << glm::to_string(b.max) << "\n}";
 	return os;
 }
 
