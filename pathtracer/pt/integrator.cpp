@@ -11,6 +11,7 @@ ActiveRay* ActiveRay::shadow(const Ray &r, const ActiveRay &parent) {
 	ActiveRay *ar = new ActiveRay(parent);
 	ar->children = 0;
 	ar->type = SHADOW;
+	ar->color.w = parent.ray.t_max;
 	ar->ray = r;
 	ar->owner_id = parent.owner_id;
 	ar->tile = parent.tile;
@@ -21,6 +22,7 @@ ActiveRay* ActiveRay::secondary(const Ray &r, const ActiveRay &parent) {
 	ActiveRay *ar = new ActiveRay(parent);
 	ar->children = 0;
 	ar->type = SECONDARY;
+	ar->color.w = parent.ray.t_max;
 	ar->ray = r;
 	ar->owner_id = parent.owner_id;
 	ar->tile = parent.tile;
