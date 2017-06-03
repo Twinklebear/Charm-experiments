@@ -170,20 +170,27 @@ void Region::send_ray(SendRayMessage *msg) {
 			},
 			&bvh
 		));
-	const glm::vec3 color = integrator.integrate(msg->ray);
+
+	pt::IntersectionResult result = integrator.integrate(msg->ray);
+	glm::vec3 color(0);
+	if (!result.shadow && !result.secondary) {
+		color = integrator.background;
+	} else if (result.shadow) {
+		// TODO: Ship off the rays
+		color = result.shadow->color;
+	}
 
 	// Backtrack in the BVH and ship the ray off to the next region it needs to
 	// traverse, if there is no next region send our result back
 	const pt::DistributedRegion *next = nullptr;
-	if (bvh.backtrack(msg->traversal)) {
-		next = bvh.intersect(msg->ray, msg->traversal);
+	if (bvh.backtrack(msg->ray)) {
+		next = bvh.intersect(msg->ray);
 	}
 	if (next) {
-		thisProxy[next->owner].send_ray(new SendRayMessage(msg->owner_id, msg->tile,
-					msg->pixel, msg->ray, msg->traversal));
+		thisProxy[next->owner].send_ray(new SendRayMessage(msg->ray));
 	} else {
-		thisProxy[msg->owner_id].report_ray(new RayResultMessage(glm::vec4(color, msg->ray.t_max),
-					msg->tile, msg->pixel));
+		thisProxy[msg->ray.owner_id].report_ray(new RayResultMessage(glm::vec4(color,
+					msg->ray.ray.t_max), msg->ray.tile, msg->ray.pixel));
 	}
 	delete msg;
 }
@@ -223,33 +230,40 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 		for (uint64_t j = 0; j < TILE_W; ++j) {
 			const float px = j + start_x;
 			const float py = i + start_y;
-			pt::Ray ray = camera.generate_ray(px, py, {real_distrib(ray_dir_rng), real_distrib(ray_dir_rng)});
+			const pt::Ray cam_ray = camera.generate_ray(px, py,
+					{real_distrib(ray_dir_rng), real_distrib(ray_dir_rng)});
+			pt::ActiveRay ray(cam_ray, thisIndex, tile.msg->tile_id, i * TILE_W + j);
 
-			pt::BVHTraversalState traversal;
-			const pt::DistributedRegion *first_region = bvh.intersect(ray, traversal);
-
+			const pt::DistributedRegion *first_region = bvh.intersect(ray);
 			if (first_region && first_region->is_mine) {
 				// If we didn't hit anything, find the next region along the ray and send
 				// the ray to it for rendering
-				const glm::vec3 color = integrator.integrate(ray);
+				pt::IntersectionResult result = integrator.integrate(ray);
+
+				glm::vec3 color(0);
+				if (!result.shadow && !result.secondary) {
+					color = integrator.background;
+				} else if (result.shadow) {
+					// TODO: Ship off the rays
+					color = result.shadow->color;
+				}
 				// Backtrack in the BVH and ship the ray off to the next region it needs to
-				// traverse. If there is no next region, write the background color
+				// traverse. If there is no next region, write the shaded color
 				const pt::DistributedRegion *next = nullptr;
-				if (bvh.backtrack(traversal)) {
-					next = bvh.intersect(ray, traversal);
+				if (bvh.backtrack(ray)) {
+					next = bvh.intersect(ray);
 				}
 				if (next) {
-					thisProxy[next->owner].send_ray(new SendRayMessage(thisIndex, tile.msg->tile_id,
-								i * TILE_W + j, ray, traversal));
+					thisProxy[next->owner].send_ray(new SendRayMessage(ray));
 				} else {
-					tile.report(j, i, glm::vec4(color, ray.t_max));
+					tile.report(j, i, glm::vec4(color, ray.ray.t_max));
 				}
 			} else {
 				// We don't own these pixels but still need to "finish" them on our local tile
 				// so we can see it as being completed. TODO: expose background color
 				// from the integrator so we don't have a hardcoded 0 background which
 				// may not match the scene background
-				tile.report(j, i, glm::vec4(0, 0, 0, ray.t_max));
+				tile.report(j, i, glm::vec4(0, 0, 0, ray.ray.t_max));
 			}
 		}
 	}
@@ -320,18 +334,19 @@ TileCompleteMessage* TileCompleteMessage::unpack(void *buf) {
 	return msg;
 }
 
-SendRayMessage::SendRayMessage() : ray(glm::vec3(NAN), glm::vec3(NAN)) {}
-SendRayMessage::SendRayMessage(uint64_t owner_id, uint64_t tile, uint64_t pixel,
-		const pt::Ray &ray, pt::BVHTraversalState traversal)
-	: owner_id(owner_id), tile(tile), pixel(pixel), ray(ray), traversal(traversal)
-{}
+SendRayMessage::SendRayMessage() : ray(pt::Ray(glm::vec3(NAN), glm::vec3(NAN)), 0, 0, 0) {}
+SendRayMessage::SendRayMessage(const pt::ActiveRay &ray) : ray(ray) {}
 void SendRayMessage::msg_pup(PUP::er &p) {
-	p | owner_id;
-	p | tile;
-	p | pixel;
-	p | ray;
-	p | traversal.current;
-	p | traversal.bitstack;
+	int ray_type = ray.type;
+	p | ray_type;
+	ray.type = static_cast<pt::RAY_TYPE>(ray_type);
+	p | ray.ray;
+	p | ray.traversal.current;
+	p | ray.traversal.bitstack;
+	p | ray.color;
+	p | ray.owner_id;
+	p | ray.tile;
+	p | ray.pixel;
 }
 
 ShadowRayMessage::ShadowRayMessage() : ray(glm::vec3(NAN), glm::vec3(NAN)) {}

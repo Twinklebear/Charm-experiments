@@ -58,9 +58,10 @@ BVH::BVH(const std::vector<const DistributedRegion*> &regions) : max_geom(1), ge
 BBox BVH::bounds() const {
 	return !flat_nodes.empty() ? flat_nodes[0].bounds : BBox{};
 }
-const DistributedRegion* BVH::intersect(const Ray &r, BVHTraversalState &state) const {
-	const glm::vec3 inv_dir = glm::vec3(1.f) / r.dir;
+const DistributedRegion* BVH::intersect(ActiveRay &r) const {
+	const glm::vec3 inv_dir = glm::vec3(1.f) / r.ray.dir;
 	const std::array<int, 3> neg_dir = {inv_dir.x < 0, inv_dir.y < 0, inv_dir.z < 0};
+	BVHTraversalState &state = r.traversal;
 	while (true) {
 		// TODO: The indices 'current' and so on will not be portable across nodes!
 		// At least, not if they don't all build the exact same BVH. Can we ensure
@@ -69,14 +70,14 @@ const DistributedRegion* BVH::intersect(const Ray &r, BVHTraversalState &state) 
 		const FlatNode &fnode = flat_nodes[state.current];
 		// If it's a leaf node we need to send the ray to the owner of the region
 		if (fnode.ngeom > 0) {
-			if (fnode.bounds.fast_intersect(r, inv_dir, neg_dir)) {
+			if (fnode.bounds.fast_intersect(r.ray, inv_dir, neg_dir)) {
 				return geometry[fnode.geom_offset];
 			}
 		} else {
 			// Check which (if any) children we hit
 			const std::array<bool, 2> child_hits{
-				flat_nodes[state.current + 1].bounds.fast_intersect(r, inv_dir, neg_dir),
-				flat_nodes[fnode.second_child].bounds.fast_intersect(r, inv_dir, neg_dir)
+				flat_nodes[state.current + 1].bounds.fast_intersect(r.ray, inv_dir, neg_dir),
+				flat_nodes[fnode.second_child].bounds.fast_intersect(r.ray, inv_dir, neg_dir)
 			};
 			if (child_hits[0] || child_hits[1]) {
 				state.bitstack = state.bitstack << 1;
@@ -96,13 +97,14 @@ const DistributedRegion* BVH::intersect(const Ray &r, BVHTraversalState &state) 
 				continue;
 			}
 		}
-		if (!backtrack(state)) {
+		if (!backtrack(r)) {
 			return nullptr;
 		}
 	}
 	return nullptr;
 }
-bool BVH::backtrack(BVHTraversalState &state) const {
+bool BVH::backtrack(ActiveRay &ray) const {
+	BVHTraversalState &state = ray.traversal;
 	while ((state.bitstack & 1) == 0) {
 		if (!state.bitstack) {
 			return false;

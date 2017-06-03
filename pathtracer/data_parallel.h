@@ -27,6 +27,7 @@ struct RenderingTile {
 	TileCompleteMessage *msg;
 	// Count of how many results we're expecting back for each pixel in the tile.
 	// Once all entries are 0, this tile is finished.
+	// TODO: Split into primary/secondary rays expected and shadow rays received counters
 	std::vector<uint64_t> results_expected;
 	// For debugging, the index of the Charm++ region we're on
 	uint64_t charm_index;
@@ -127,15 +128,12 @@ class SendRayMessage : public CMessage_SendRayMessage {
 	SendRayMessage();
 
 public:
-	uint64_t owner_id, tile, pixel;
 	// TODO: Packets or larger chunks of rays, compression.
 	// Should convert renderer to a stream system and send sorted
 	// SoA ray groups which we compress w/ ZFP.
-	pt::Ray ray;
-	pt::BVHTraversalState traversal;
+	pt::ActiveRay ray;
 
-	SendRayMessage(uint64_t owner_id, uint64_t tile, uint64_t pixel, const pt::Ray &ray,
-			pt::BVHTraversalState traversal);
+	SendRayMessage(const pt::ActiveRay &ray);
 	void msg_pup(PUP::er &p);
 };
 

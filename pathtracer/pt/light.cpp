@@ -11,19 +11,8 @@ LightSample::LightSample(const glm::vec3 &illum, const glm::vec3 &dir, const Ray
 bool LightSample::occluded(const Scene &scene) const {
 	DifferentialGeometry dg;
 	Ray r = occlusion_ray;
-	if (scene.bvh) {
-		BVHTraversalState traversal;
-		const DistributedRegion *region = scene.bvh->intersect(r, traversal);
-		// This is totally possible if our box has no size on one axis (e.g. a plane)
-		// however it's rare that it would happen. We should always first traverse our
-		// local geometry for a hit and then try sending the ray off. I doubt that in
-		// a real situation a node would have a single plane as its data, or in some
-		// other way some super funky distribution like that.
-		if (region && !region->is_mine) {
-			std::cout << "occlusion test first region isn't mine!? owner is "
-				<< region->owner << "\n";
-		}
-	}
+	//  Occluded only makes sense for testing against the local data
+	assert(!scene.bvh);
 	return scene.intersect(r, dg);
 }
 

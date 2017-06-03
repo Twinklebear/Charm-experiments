@@ -7,6 +7,7 @@
 #include "bbox.h"
 #include "diff_geom.h"
 #include "hit_integrator.h"
+#include "integrator.h"
 #include "normal_integrator.h"
 #include "whitted_integrator.h"
 #include "path_integrator.h"
