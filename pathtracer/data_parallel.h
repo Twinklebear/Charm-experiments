@@ -28,15 +28,20 @@ struct RenderingTile {
 	// Count of how many results we're expecting back for each pixel in the tile.
 	// Once all entries are 0, this tile is finished.
 	// TODO: Split into primary/secondary rays expected and shadow rays received counters
-	std::vector<uint64_t> results_expected;
+	// primary rays might be an awkward term here, since in the pathtracing case I'm referring
+	// really to "paths" received where it means the entire primary ray + secondaries which
+	// we count as one "path" which spawns some number of shadow rays.
+	std::vector<uint64_t> shadow_rays_expected, shadow_rays_received, primary_rays_expected;
 	// For debugging, the index of the Charm++ region we're on
 	uint64_t charm_index;
 
 	// Construct a new rendering tile, will expect 1 result per pixel by default.
 	RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const int64_t num_other_tiles,
 			const uint64_t charm_index);
-	// Report a rendering result for some pixel in this tile, result = {R, G, B, Z}
-	void report(const uint64_t x, const uint64_t y, const glm::vec4 &result);
+	/* Report a primary ray, informing the tile how many shadow test results to
+	 * expect for the pixel to determine completion
+	 */
+	void report_primary_ray(const uint64_t px, const uint64_t children);
 	// Report a rendering result for some pixel in this tile, result = {R, G, B, Z}
 	void report(const uint64_t px, const glm::vec4 &result);
 	bool complete() const;
@@ -137,22 +142,6 @@ public:
 	void msg_pup(PUP::er &p);
 };
 
-class ShadowRayMessage : public CMessage_ShadowRayMessage {
-	ShadowRayMessage();
-
-public:
-	uint64_t owner_id, tile, pixel;
-	// Partial shading is the color we're accumulating into for this pixel,
-	// while surface color is the current surface being shaded, to be multiplied
-	// with the light color if it's not occluded.
-	glm::vec3 partial_shading, surface_color;
-	// TODO: Packets or larger chunks of rays, compression.
-	// Should convert renderer to a stream system and send sorted
-	// SoA ray groups which we compress w/ ZFP.
-	pt::Ray ray;
-	pt::BVHTraversalState traversal;
-};
-
 class RayResultMessage : public CMessage_RayResultMessage {
 	RayResultMessage();
 
@@ -161,8 +150,13 @@ public:
 	// TODO: Again, packets or larger, compression, etc.
 	glm::vec4 result;
 	uint64_t tile, pixel;
+	pt::RAY_TYPE type;
+	// If this ray is a primary ray or "path", this is the # of shadow
+	// rays spawned along this path we should expect to get results from
+	uint64_t children;
 
-	RayResultMessage(const glm::vec4 &result, uint64_t tile, uint64_t pixel);
+	RayResultMessage(const glm::vec4 &result, uint64_t tile, uint64_t pixel,
+			pt::RAY_TYPE type, uint64_t children);
 	void msg_pup(PUP::er &p);
 };
 

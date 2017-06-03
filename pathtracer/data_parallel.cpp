@@ -20,12 +20,16 @@ extern uint64_t NUM_REGIONS;
 
 RenderingTile::RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const int64_t num_other_tiles,
 		const uint64_t charm_index)
-	: msg(new TileCompleteMessage(tile_x, tile_y, num_other_tiles)), results_expected(TILE_W * TILE_H, 1),
-	charm_index(charm_index)
+	: msg(new TileCompleteMessage(tile_x, tile_y, num_other_tiles)), shadow_rays_expected(TILE_W * TILE_H, 0),
+	shadow_rays_received(TILE_W * TILE_H, 0), primary_rays_expected(TILE_W * TILE_H, 1), charm_index(charm_index)
 {}
-void RenderingTile::report(const uint64_t x, const uint64_t y, const glm::vec4 &result) {
-	const size_t tx = y * TILE_W + x;
-	report(tx, result);
+void RenderingTile::report_primary_ray(const uint64_t px, const uint64_t children) {
+	if (primary_rays_expected[px] == 0) {
+		throw std::runtime_error("Unexpected primary ray reported on tile! #"
+				+ std::to_string(msg->tile_id));
+	}
+	primary_rays_expected[px] -= 1;
+	shadow_rays_expected[px] += children;
 }
 void RenderingTile::report(const uint64_t px, const glm::vec4 &result) {
 	const size_t tx = px * 4;
@@ -35,13 +39,14 @@ void RenderingTile::report(const uint64_t px, const glm::vec4 &result) {
 	for (size_t c = 0; c < 4; ++c) {
 		msg->tile[tx + c] = result[c];
 	}
-	if (results_expected[px] == 0) {
-		throw std::runtime_error("Unexpected result reported on tile! #" + std::to_string(msg->tile_id));
-	}
-	results_expected[px] -= 1;
+	shadow_rays_received[px] += 1;
 }
 bool RenderingTile::complete() const {
-	return std::all_of(results_expected.begin(), results_expected.end(), [](const uint64_t &x) { return x == 0; });
+	const bool primary_done = *std::max_element(primary_rays_expected.begin(),
+			primary_rays_expected.end()) == 0;
+	const bool shadow_done = std::equal(shadow_rays_received.begin(), shadow_rays_received.end(),
+			shadow_rays_expected.begin());
+	return primary_done && shadow_done;
 }
 
 Region::Region() : rng(std::random_device()()), bounds_received(0) {
@@ -190,7 +195,8 @@ void Region::send_ray(SendRayMessage *msg) {
 		thisProxy[next->owner].send_ray(new SendRayMessage(msg->ray));
 	} else {
 		thisProxy[msg->ray.owner_id].report_ray(new RayResultMessage(glm::vec4(color,
-					msg->ray.ray.t_max), msg->ray.tile, msg->ray.pixel));
+					msg->ray.ray.t_max), msg->ray.tile, msg->ray.pixel,
+					msg->ray.type, msg->ray.children));
 	}
 	delete msg;
 }
@@ -199,7 +205,17 @@ void Region::report_ray(RayResultMessage *msg) {
 	if (rt == rendering_tiles.end()) {
 		throw std::runtime_error("Invalid msg->tile id in RayResultMessage!");
 	}
-	rt->second.report(msg->pixel, msg->result);
+	switch (msg->type) {
+		case pt::RAY_TYPE::PRIMARY:
+			rt->second.report_primary_ray(msg->pixel, 1);//msg->children);
+			rt->second.report(msg->pixel, msg->result);
+			break;
+		case pt::RAY_TYPE::SHADOW:
+			rt->second.report(msg->pixel, msg->result);
+			break;
+		default:
+			std::cout << "Unhandled ray type in report_ray!\n";
+	}
 	delete msg;
 
 	if (rt->second.complete()) {
@@ -230,9 +246,10 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 		for (uint64_t j = 0; j < TILE_W; ++j) {
 			const float px = j + start_x;
 			const float py = i + start_y;
+			const uint64_t pixel = i * TILE_W + j;
 			const pt::Ray cam_ray = camera.generate_ray(px, py,
 					{real_distrib(ray_dir_rng), real_distrib(ray_dir_rng)});
-			pt::ActiveRay ray(cam_ray, thisIndex, tile.msg->tile_id, i * TILE_W + j);
+			pt::ActiveRay ray(cam_ray, thisIndex, tile.msg->tile_id, pixel);
 
 			const pt::DistributedRegion *first_region = bvh.intersect(ray);
 			if (first_region && first_region->is_mine) {
@@ -256,14 +273,16 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 				if (next) {
 					thisProxy[next->owner].send_ray(new SendRayMessage(ray));
 				} else {
-					tile.report(j, i, glm::vec4(color, ray.ray.t_max));
+					tile.report_primary_ray(pixel, 1);
+					tile.report(pixel, glm::vec4(color, ray.ray.t_max));
 				}
 			} else {
 				// We don't own these pixels but still need to "finish" them on our local tile
 				// so we can see it as being completed. TODO: expose background color
 				// from the integrator so we don't have a hardcoded 0 background which
 				// may not match the scene background
-				tile.report(j, i, glm::vec4(0, 0, 0, ray.ray.t_max));
+				tile.report_primary_ray(pixel, 1);
+				tile.report(pixel, glm::vec4(0, 0, 0, ray.ray.t_max));
 			}
 		}
 	}
@@ -349,16 +368,19 @@ void SendRayMessage::msg_pup(PUP::er &p) {
 	p | ray.pixel;
 }
 
-ShadowRayMessage::ShadowRayMessage() : ray(glm::vec3(NAN), glm::vec3(NAN)) {}
-
 RayResultMessage::RayResultMessage() {}
-RayResultMessage::RayResultMessage(const glm::vec4 &result, uint64_t tile, uint64_t pixel)
-	: result(result), tile(tile), pixel(pixel)
+RayResultMessage::RayResultMessage(const glm::vec4 &result, uint64_t tile, uint64_t pixel,
+		pt::RAY_TYPE type, uint64_t children)
+	: result(result), tile(tile), pixel(pixel), type(type), children(children)
 {}
 void RayResultMessage::msg_pup(PUP::er &p) {
 	p | result;
 	p | tile;
 	p | pixel;
+	int ray_type = type;
+	p | ray_type;
+	type = static_cast<pt::RAY_TYPE>(ray_type);
+	p | children;
 }
 
 #include "data_parallel.def.h"

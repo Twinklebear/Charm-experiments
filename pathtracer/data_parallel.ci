@@ -5,9 +5,6 @@ module data_parallel {
 	message TileCompleteMessage;
 	// Message sent to a region that it should render some ray
 	message SendRayMessage;
-	// Message sent to a region that it should perform the shadow test
-	// and shading for some occlusion test ray.
-	message ShadowRayMessage;
 	// Message sent to the primary ray owner when a ray is completed
 	message RayResultMessage;
 
