@@ -2,6 +2,7 @@
 #include <sstream>
 #include <algorithm>
 #include <iostream>
+#define GLM_FORCE_SWIZZLE
 #include <glm/glm.hpp>
 #include "main.decl.h"
 #include "main.h"
@@ -43,7 +44,7 @@ void RenderingTile::report(const uint64_t px, const glm::vec4 &result) {
 	// for the pixel plus (optionally) the primary ray branch factor and we accumulate
 	// until we get all the results back then normalize the color values.
 	for (size_t c = 0; c < 4; ++c) {
-		msg->tile[tx + c] += result[c];
+		msg->tile[tx + c] = result[c];
 	}
 	shadow_rays_received[px] += 1;
 }
@@ -63,8 +64,9 @@ Region::Region() : rng(std::random_device()()), bounds_received(0) {
 		std::shared_ptr<pt::BxDF> lambertian_blue = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
 		my_object = std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.7, 1.0), 0.25, lambertian_blue);
 	} else {
-		std::shared_ptr<pt::BxDF> lambertian_white = std::make_shared<pt::Lambertian>(glm::vec3(0.9));
-		my_object = std::make_shared<pt::Plane>(glm::vec3(0, 0, -1.5), glm::vec3(0, 0, 1), 6, lambertian_white);
+		std::shared_ptr<pt::BxDF> lambertian_green = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.8, 0.1));
+		my_object = std::make_shared<pt::Plane>(glm::vec3(0), glm::vec3(0, 1, 0), 4,
+				lambertian_green);
 	}
 	other_bounds.resize(NUM_REGIONS);
 	world.resize(NUM_REGIONS);
@@ -174,35 +176,96 @@ void Region::render() {
 void Region::send_ray(SendRayMessage *msg) {
 	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
 	// or at least keep the scene alive, since the Region may have multiple geometry
-	pt::WhittedIntegrator integrator(glm::vec3(0),
+	pt::WhittedIntegrator integrator(glm::vec3(0.05),
 		pt::Scene({my_object},
 			{
-				std::make_shared<pt::PointLight>(glm::vec3(-0.1, 0.5, 2), glm::vec3(2)),
+				std::make_shared<pt::PointLight>(glm::vec3(1.5, 1.2, 1.5), glm::vec3(2)),
 			},
 			&bvh
 		));
 
-	pt::IntersectionResult result = integrator.integrate(msg->ray);
-	glm::vec3 color(0);
-	if (!result.shadow && !result.secondary) {
-		color = integrator.background;
-	} else if (result.shadow) {
-		// TODO: Ship off the rays
-		color = result.shadow->color;
-	}
+	/* Reporting rays:
+	 * - PRIMARY with no results: We didn't hit anything.
+	 *   	1. Send back the background color and 0 kids to tell the owner the ray is done.
+	 * - PRIMARY with SHADOW: We hit something
+	 *   	1. Send back the primary ray with 1 child count to tell the owner to expect a shadow ray.
+	 *   	2. Traverse the shadow ray through the scene and ship it off if needed
+	 *
+	 * - SHADOW with no hit: The surface point is illuminated.
+	 *   	1. Send the owner the shaded result color.
+	 * - SHADOW with a hit: The surface point is not illuminated.
+	 *   	1. Send the owner back black for the shading result.
+	 */
+	if (msg->ray.type == pt::RAY_TYPE::PRIMARY) {
+		pt::IntersectionResult result = integrator.integrate(msg->ray);
+		if (!result.shadow && !result.secondary) {
+			// Backtrack in the BVH and ship the ray off to the next region it needs to
+			// traverse, if there is no next region send the background color back
+			const pt::DistributedRegion *next = nullptr;
+			if (bvh.backtrack(msg->ray)) {
+				next = bvh.intersect(msg->ray);
+			}
+			if (next) {
+				thisProxy[next->owner].send_ray(new SendRayMessage(msg->ray));
+			} else {
+				thisProxy[msg->ray.owner_id].report_ray(new RayResultMessage(glm::vec4(integrator.background,
+							msg->ray.ray.t_max), msg->ray.tile, msg->ray.pixel,
+							msg->ray.type, msg->ray.children));
+			}
+		} else if (result.shadow) {
+			// Report that we've spawned a shadow ray and traverse it
+			thisProxy[msg->ray.owner_id].report_ray(new RayResultMessage(glm::vec4(glm::vec3(0),
+						msg->ray.ray.t_max), msg->ray.tile, msg->ray.pixel,
+						msg->ray.type, 1));
 
-	// Backtrack in the BVH and ship the ray off to the next region it needs to
-	// traverse, if there is no next region send our result back
-	const pt::DistributedRegion *next = nullptr;
-	if (bvh.backtrack(msg->ray)) {
-		next = bvh.intersect(msg->ray);
-	}
-	if (next) {
-		thisProxy[next->owner].send_ray(new SendRayMessage(msg->ray));
-	} else {
-		thisProxy[msg->ray.owner_id].report_ray(new RayResultMessage(glm::vec4(color,
-					msg->ray.ray.t_max), msg->ray.tile, msg->ray.pixel,
-					msg->ray.type, msg->ray.children));
+			const pt::DistributedRegion *shadow_region = bvh.intersect(*result.shadow);
+			bool occluded = false;
+			if (shadow_region && shadow_region->is_mine) {
+				occluded = integrator.occluded(*result.shadow);
+			}
+			// If our local data doesn't occlude the point, is there some other region that might?
+			if (!occluded) {
+				if (bvh.backtrack(*result.shadow)) {
+					shadow_region = bvh.intersect(*result.shadow);
+				}
+			}
+			// If we occluded it with local data, we're done. Otherwise there might be
+			// data on some other node which occludes and we need to ship the ray off.
+			// If there is no next region to traverse, the point is not occluded.
+			if (occluded || result.shadow->color.xyz() == glm::vec3(0)) {
+				thisProxy[result.shadow->owner_id].report_ray(new RayResultMessage(
+							glm::vec4(glm::vec3(0), result.shadow->color.w),
+							result.shadow->tile, result.shadow->pixel,
+							pt::RAY_TYPE::SHADOW, 0));
+			} else if (shadow_region) {
+				thisProxy[shadow_region->owner].send_ray(new SendRayMessage(*result.shadow));
+			} else {
+				thisProxy[result.shadow->owner_id].report_ray(new RayResultMessage(result.shadow->color,
+							result.shadow->tile, result.shadow->pixel, pt::RAY_TYPE::SHADOW, 0));
+			}
+		}
+	} else if (msg->ray.type == pt::RAY_TYPE::SHADOW) {
+		bool occluded = integrator.occluded(msg->ray);
+		// If our local data doesn't occlude the point, is there some other region that might?
+		const pt::DistributedRegion *next = nullptr;
+		if (!occluded) {
+			if (bvh.backtrack(msg->ray)) {
+				next = bvh.intersect(msg->ray);
+			}
+		}
+		// If we occluded it with local data, we're done. Otherwise there might be
+		// data on some other node which occludes and we need to ship the ray off.
+		// If there is no next region to traverse, the point is not occluded.
+		if (occluded) {
+			thisProxy[msg->ray.owner_id].report_ray(new RayResultMessage(
+						glm::vec4(glm::vec3(0, 1, 1), msg->ray.color.w),
+						msg->ray.tile, msg->ray.pixel, msg->ray.type, 0));
+		} else if (next) {
+			thisProxy[next->owner].send_ray(new SendRayMessage(msg->ray));
+		} else {
+			thisProxy[msg->ray.owner_id].report_ray(new RayResultMessage(msg->ray.color,
+						msg->ray.tile, msg->ray.pixel, msg->ray.type, 0));
+		}
 	}
 	delete msg;
 }
@@ -233,10 +296,10 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
 	// or at least keep the scene alive, since the Region may have multiple geometry
 	const pt::Camera camera(scene->cam_pos, scene->cam_target, scene->cam_up, 65.0, IMAGE_W, IMAGE_H);
-	pt::WhittedIntegrator integrator(glm::vec3(0),
+	pt::WhittedIntegrator integrator(glm::vec3(0.05),
 		pt::Scene({my_object},
 			{
-				std::make_shared<pt::PointLight>(glm::vec3(-0.1, 0.5, 2), glm::vec3(2)),
+				std::make_shared<pt::PointLight>(glm::vec3(1.5, 1.2, 1.5), glm::vec3(2)),
 			},
 			&bvh
 		));
@@ -256,36 +319,61 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 					{real_distrib(ray_dir_rng), real_distrib(ray_dir_rng)});
 			pt::ActiveRay ray(cam_ray, thisIndex, tile.msg->tile_id, pixel);
 
+			// TODO: How to unify this code-path with the send_ray codepath?
+			// I'd like to avoid allocating many ray result messages in the case where
+			// we locally render most of the tiles pixels, making the results handling
+			// parts just subtly distinct enough to be annoying.
 			const pt::DistributedRegion *first_region = bvh.intersect(ray);
 			if (first_region && first_region->is_mine) {
 				// If we didn't hit anything, find the next region along the ray and send
 				// the ray to it for rendering
 				pt::IntersectionResult result = integrator.integrate(ray);
-
-				glm::vec3 color(0);
 				if (!result.shadow && !result.secondary) {
-					color = integrator.background;
+					// No hit, backtrack in the BVH and ship the ray off to the next region it needs to
+					// traverse. If there is no next region, write the background color
+					const pt::DistributedRegion *next = nullptr;
+					if (bvh.backtrack(ray)) {
+						next = bvh.intersect(ray);
+					}
+					if (next) {
+						thisProxy[next->owner].send_ray(new SendRayMessage(ray));
+					} else {
+						tile.report_primary_ray(pixel, 0, glm::vec4(integrator.background,
+									std::numeric_limits<float>::max()));
+					}
 				} else if (result.shadow) {
-					// TODO: Ship off the rays
-					color = result.shadow->color;
-				}
-				// Backtrack in the BVH and ship the ray off to the next region it needs to
-				// traverse. If there is no next region, write the shaded color
-				const pt::DistributedRegion *next = nullptr;
-				if (bvh.backtrack(ray)) {
-					next = bvh.intersect(ray);
-				}
-				if (next) {
-					thisProxy[next->owner].send_ray(new SendRayMessage(ray));
-				} else {
-					tile.report_primary_ray(pixel, 0, glm::vec4(color, ray.ray.t_max));
+					// Report that we've spawned a shadow ray and traverse it
+					tile.report_primary_ray(pixel, 1, glm::vec4(glm::vec3(0), ray.ray.t_max));
+
+					const pt::DistributedRegion *shadow_region = bvh.intersect(*result.shadow);
+					bool occluded = false;
+					if (shadow_region && shadow_region->is_mine) {
+						occluded = integrator.occluded(*result.shadow);
+					}
+					// If our local data doesn't occlude the point, is there some other region that might?
+					if (!occluded) {
+						if (bvh.backtrack(*result.shadow)) {
+							shadow_region = bvh.intersect(*result.shadow);
+						}
+					}
+					// If we occluded it with local data, we're done. Otherwise there might be
+					// data on some other node which occludes and we need to ship the ray off.
+					// If there is no next region to traverse, the point is not occluded.
+					if (occluded || result.shadow->color.xyz() == glm::vec3(0)) {
+						tile.report(pixel, glm::vec4(glm::vec3(0), result.shadow->color.w));
+					} else if (shadow_region) {
+						thisProxy[shadow_region->owner].send_ray(new SendRayMessage(*result.shadow));
+					} else {
+						tile.report(pixel, result.shadow->color);
+					}
 				}
 			} else {
 				// We don't own these pixels but still need to "finish" them on our local tile
 				// so we can see it as being completed. TODO: expose background color
 				// from the integrator so we don't have a hardcoded 0 background which
 				// may not match the scene background
-				tile.report_primary_ray(pixel, 0, glm::vec4(0, 0, 0, ray.ray.t_max));
+				tile.report_primary_ray(pixel, 0, glm::vec4(integrator.background,
+							std::numeric_limits<float>::infinity()));
 			}
 		}
 	}

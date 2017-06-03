@@ -41,6 +41,7 @@ struct RenderingTile {
 	/* Report a primary ray, informing the tile how many shadow test results to
 	 * expect for the pixel to determine completion. If the ray has no children
 	 * the result will be written to the tile
+	 * TODO: This dual-path method is confusing as hell. Split it up.
 	 */
 	void report_primary_ray(const uint64_t px, const uint64_t children, const glm::vec4 &result);
 	// Report a rendering result for some pixel in this tile, result = {R, G, B, Z}
