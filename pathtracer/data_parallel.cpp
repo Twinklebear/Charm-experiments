@@ -23,13 +23,19 @@ RenderingTile::RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const
 	: msg(new TileCompleteMessage(tile_x, tile_y, num_other_tiles)), shadow_rays_expected(TILE_W * TILE_H, 0),
 	shadow_rays_received(TILE_W * TILE_H, 0), primary_rays_expected(TILE_W * TILE_H, 1), charm_index(charm_index)
 {}
-void RenderingTile::report_primary_ray(const uint64_t px, const uint64_t children) {
+void RenderingTile::report_primary_ray(const uint64_t px, const uint64_t children, const glm::vec4 &result) {
 	if (primary_rays_expected[px] == 0) {
 		throw std::runtime_error("Unexpected primary ray reported on tile! #"
 				+ std::to_string(msg->tile_id));
 	}
 	primary_rays_expected[px] -= 1;
 	shadow_rays_expected[px] += children;
+	if (children == 0) {
+		const size_t tx = px * 4;
+		for (size_t c = 0; c < 4; ++c) {
+			msg->tile[tx + c] = result[c];
+		}
+	}
 }
 void RenderingTile::report(const uint64_t px, const glm::vec4 &result) {
 	const size_t tx = px * 4;
@@ -37,7 +43,7 @@ void RenderingTile::report(const uint64_t px, const glm::vec4 &result) {
 	// for the pixel plus (optionally) the primary ray branch factor and we accumulate
 	// until we get all the results back then normalize the color values.
 	for (size_t c = 0; c < 4; ++c) {
-		msg->tile[tx + c] = result[c];
+		msg->tile[tx + c] += result[c];
 	}
 	shadow_rays_received[px] += 1;
 }
@@ -207,8 +213,7 @@ void Region::report_ray(RayResultMessage *msg) {
 	}
 	switch (msg->type) {
 		case pt::RAY_TYPE::PRIMARY:
-			rt->second.report_primary_ray(msg->pixel, 1);//msg->children);
-			rt->second.report(msg->pixel, msg->result);
+			rt->second.report_primary_ray(msg->pixel, msg->children, msg->result);
 			break;
 		case pt::RAY_TYPE::SHADOW:
 			rt->second.report(msg->pixel, msg->result);
@@ -273,16 +278,14 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 				if (next) {
 					thisProxy[next->owner].send_ray(new SendRayMessage(ray));
 				} else {
-					tile.report_primary_ray(pixel, 1);
-					tile.report(pixel, glm::vec4(color, ray.ray.t_max));
+					tile.report_primary_ray(pixel, 0, glm::vec4(color, ray.ray.t_max));
 				}
 			} else {
 				// We don't own these pixels but still need to "finish" them on our local tile
 				// so we can see it as being completed. TODO: expose background color
 				// from the integrator so we don't have a hardcoded 0 background which
 				// may not match the scene background
-				tile.report_primary_ray(pixel, 1);
-				tile.report(pixel, glm::vec4(0, 0, 0, ray.ray.t_max));
+				tile.report_primary_ray(pixel, 0, glm::vec4(0, 0, 0, ray.ray.t_max));
 			}
 		}
 	}
