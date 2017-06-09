@@ -58,15 +58,15 @@ bool RenderingTile::complete() const {
 
 Region::Region() : rng(std::random_device()()), bounds_received(0) {
 	if (thisIndex == 0) {
-		std::shared_ptr<pt::BxDF> lambertian_red = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
-		my_object = std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, lambertian_red);
-	} else if (thisIndex == 1) {
-		std::shared_ptr<pt::BxDF> lambertian_blue = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
-		my_object = std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.7, 1.0), 0.25, lambertian_blue);
-	} else {
 		std::shared_ptr<pt::BxDF> lambertian_green = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.8, 0.1));
-		my_object = std::make_shared<pt::Plane>(glm::vec3(0), glm::vec3(0, 1, 0), 4,
+		my_object = std::make_shared<pt::Plane>(glm::vec3(0), glm::vec3(0, 1, 0.5), 4,
 				lambertian_green);
+	} else if (thisIndex == 1) {
+		std::shared_ptr<pt::BxDF> lambertian_red = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
+		my_object = std::make_shared<pt::Sphere>(glm::vec3(-0.5, 0, 0), 0.7, lambertian_red);
+	} else {
+		std::shared_ptr<pt::BxDF> lambertian_blue = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
+		my_object = std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.5, 0.5), 0.25, lambertian_blue);
 	}
 	other_bounds.resize(NUM_REGIONS);
 	world.resize(NUM_REGIONS);
@@ -179,7 +179,7 @@ void Region::send_ray(SendRayMessage *msg) {
 	pt::WhittedIntegrator integrator(glm::vec3(0.05),
 		pt::Scene({my_object},
 			{
-				std::make_shared<pt::PointLight>(glm::vec3(1.5, 1.2, 1.5), glm::vec3(2)),
+				std::make_shared<pt::PointLight>(glm::vec3(1.5, 1, 1), glm::vec3(2)),
 			},
 			&bvh
 		));
@@ -258,7 +258,7 @@ void Region::send_ray(SendRayMessage *msg) {
 		// If there is no next region to traverse, the point is not occluded.
 		if (occluded) {
 			thisProxy[msg->ray.owner_id].report_ray(new RayResultMessage(
-						glm::vec4(glm::vec3(0, 1, 1), msg->ray.color.w),
+						glm::vec4(glm::vec3(0), msg->ray.color.w),
 						msg->ray.tile, msg->ray.pixel, msg->ray.type, 0));
 		} else if (next) {
 			thisProxy[next->owner].send_ray(new SendRayMessage(msg->ray));
@@ -299,7 +299,7 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 	pt::WhittedIntegrator integrator(glm::vec3(0.05),
 		pt::Scene({my_object},
 			{
-				std::make_shared<pt::PointLight>(glm::vec3(1.5, 1.2, 1.5), glm::vec3(2)),
+				std::make_shared<pt::PointLight>(glm::vec3(1.5, 1, 1), glm::vec3(2)),
 			},
 			&bvh
 		));
@@ -324,7 +324,14 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 			// we locally render most of the tiles pixels, making the results handling
 			// parts just subtly distinct enough to be annoying.
 			const pt::DistributedRegion *first_region = bvh.intersect(ray);
-			if (first_region && first_region->is_mine) {
+			while (first_region && !first_region->is_mine) {
+				if (bvh.backtrack(ray)) {
+					first_region = bvh.intersect(ray);
+				} else {
+					first_region = nullptr;
+				}
+			}
+			if (first_region) {
 				// If we didn't hit anything, find the next region along the ray and send
 				// the ray to it for rendering
 				pt::IntersectionResult result = integrator.integrate(ray);
