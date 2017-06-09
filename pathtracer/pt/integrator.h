@@ -41,6 +41,7 @@ struct ActiveRay {
 
 	ActiveRay(const Ray &r, const uint64_t owner_id, const uint64_t tile,
 			const uint64_t pixel);
+	// TODO: Maybe just return a unique_ptr?
 	static ActiveRay* shadow(const Ray &r, const ActiveRay &parent);
 	static ActiveRay* secondary(const Ray &r, const ActiveRay &parent);
 };
