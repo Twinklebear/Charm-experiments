@@ -115,6 +115,7 @@ void Region::render() {
 
 	// Project the bounds of this regions data to the screen so we can determine which tiles
 	// the region touches, and thus needs to render
+	// TODO: project_bounds is very wrong.
 	const pt::BBox screen_bounds = project_bounds(my_object->bounds());
 	{
 		std::stringstream tmp;
@@ -263,8 +264,14 @@ void Region::send_ray(SendRayMessage *msg) {
 		} else if (next) {
 			thisProxy[next->owner].send_ray(new SendRayMessage(msg->ray));
 		} else {
+#if 1
 			thisProxy[msg->ray.owner_id].report_ray(new RayResultMessage(msg->ray.color,
 						msg->ray.tile, msg->ray.pixel, msg->ray.type, 0));
+#else
+			thisProxy[msg->ray.owner_id].report_ray(new RayResultMessage(
+						glm::vec4(thisIndex / 3.0, 0, 0, msg->ray.color.w),
+						msg->ray.tile, msg->ray.pixel, msg->ray.type, 0));
+#endif
 		}
 	}
 	delete msg;
