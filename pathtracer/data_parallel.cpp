@@ -63,7 +63,7 @@ Region::Region() : rng(std::random_device()()), bounds_received(0) {
 				lambertian_green);
 	} else if (thisIndex == 1) {
 		std::shared_ptr<pt::BxDF> lambertian_red = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
-		my_object = std::make_shared<pt::Sphere>(glm::vec3(-0.5, 0, 0), 0.7, lambertian_red);
+		my_object = std::make_shared<pt::Sphere>(glm::vec3(0), 0.7, lambertian_red);
 	} else {
 		std::shared_ptr<pt::BxDF> lambertian_blue = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
 		my_object = std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.5, 0.5), 0.25, lambertian_blue);
@@ -180,7 +180,7 @@ void Region::send_ray(SendRayMessage *msg) {
 	pt::WhittedIntegrator integrator(glm::vec3(0.05),
 		pt::Scene({my_object},
 			{
-				std::make_shared<pt::PointLight>(glm::vec3(1.5, 1, 1), glm::vec3(2)),
+				std::make_shared<pt::PointLight>(glm::vec3(1.5, 1, 0.5), glm::vec3(2)),
 			},
 			&bvh
 		));
@@ -250,8 +250,12 @@ void Region::send_ray(SendRayMessage *msg) {
 		// If our local data doesn't occlude the point, is there some other region that might?
 		const pt::DistributedRegion *next = nullptr;
 		if (!occluded) {
+			std::cout << "not occluded, will backtrack " << msg->ray.traversal << "\n";
 			if (bvh.backtrack(msg->ray)) {
+				std::cout << "after backtrack " << msg->ray.traversal << "\n";
 				next = bvh.intersect(msg->ray);
+				std::cout << "after intersect " << msg->ray.traversal << ", next == nullptr ?"
+					<< std::boolalpha << (next == nullptr) << "\n";
 			}
 		}
 		// If we occluded it with local data, we're done. Otherwise there might be
@@ -264,10 +268,13 @@ void Region::send_ray(SendRayMessage *msg) {
 		} else if (next) {
 			thisProxy[next->owner].send_ray(new SendRayMessage(msg->ray));
 		} else {
-#if 1
+#if 0
 			thisProxy[msg->ray.owner_id].report_ray(new RayResultMessage(msg->ray.color,
 						msg->ray.tile, msg->ray.pixel, msg->ray.type, 0));
 #else
+			// TODO: It seems like the plane chare is sending the shadow test to itself,
+			// and then incorrectly thinking it doesn't need to test the node with the
+			// sphere on it. Is there a bug in the BVH traversal code?
 			thisProxy[msg->ray.owner_id].report_ray(new RayResultMessage(
 						glm::vec4(thisIndex / 3.0, 0, 0, msg->ray.color.w),
 						msg->ray.tile, msg->ray.pixel, msg->ray.type, 0));
@@ -306,7 +313,7 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 	pt::WhittedIntegrator integrator(glm::vec3(0.05),
 		pt::Scene({my_object},
 			{
-				std::make_shared<pt::PointLight>(glm::vec3(1.5, 1, 1), glm::vec3(2)),
+				std::make_shared<pt::PointLight>(glm::vec3(1.5, 1, 0.5), glm::vec3(2)),
 			},
 			&bvh
 		));

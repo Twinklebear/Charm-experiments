@@ -1,3 +1,4 @@
+#include <bitset>
 #include "integrator.h"
 
 namespace pt {
@@ -30,5 +31,11 @@ ActiveRay* ActiveRay::secondary(const Ray &r, const ActiveRay &parent) {
 	return ar;
 }
 
+}
+
+std::ostream& operator<<(std::ostream &os, const pt::BVHTraversalState &s) {
+	os << "BVHTraversalState { current: " << s.current << ", bitstack: "
+		<< std::bitset<sizeof(size_t)>(s.bitstack) << " }";
+	return os;
 }
 

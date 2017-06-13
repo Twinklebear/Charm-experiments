@@ -57,3 +57,5 @@ struct IntersectionResult {
 
 }
 
+std::ostream& operator<<(std::ostream &os, const pt::BVHTraversalState &s);
+
