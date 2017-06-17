@@ -250,12 +250,14 @@ void Region::send_ray(SendRayMessage *msg) {
 		// If our local data doesn't occlude the point, is there some other region that might?
 		const pt::DistributedRegion *next = nullptr;
 		if (!occluded) {
-			std::cout << "not occluded, will backtrack " << msg->ray.traversal << "\n";
+			std::cout << "not occluded on " << thisIndex << ", will backtrack " << msg->ray.traversal << "\n";
 			if (bvh.backtrack(msg->ray)) {
 				std::cout << "after backtrack " << msg->ray.traversal << "\n";
 				next = bvh.intersect(msg->ray);
 				std::cout << "after intersect " << msg->ray.traversal << ", next == nullptr ?"
 					<< std::boolalpha << (next == nullptr) << "\n";
+			} else {
+				std::cout << "backtrack said we were done on " << thisIndex << "\n";
 			}
 		}
 		// If we occluded it with local data, we're done. Otherwise there might be
