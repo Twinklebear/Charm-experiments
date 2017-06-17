@@ -63,10 +63,6 @@ const DistributedRegion* BVH::intersect(ActiveRay &r) const {
 	const std::array<int, 3> neg_dir = {inv_dir.x < 0, inv_dir.y < 0, inv_dir.z < 0};
 	BVHTraversalState &state = r.traversal;
 	while (true) {
-		// TODO: The indices 'current' and so on will not be portable across nodes!
-		// At least, not if they don't all build the exact same BVH. Can we ensure
-		// that if we are sure that they all have the DistributedRegions in the
-		// same order when they build though?
 		const FlatNode &fnode = flat_nodes[state.current];
 		// If it's a leaf node we need to send the ray to the owner of the region
 		if (fnode.ngeom > 0) {
