@@ -57,5 +57,6 @@ struct IntersectionResult {
 
 }
 
+std::ostream& operator<<(std::ostream &os, const pt::ActiveRay &r);
 std::ostream& operator<<(std::ostream &os, const pt::BVHTraversalState &s);
 
