@@ -8,8 +8,6 @@
 
 namespace pt {
 
-BVHTraversalState::BVHTraversalState() : current(0), bitstack(0) {}
-
 // Bucket used for SAH split method
 struct SAHBucket {
 	size_t count;
