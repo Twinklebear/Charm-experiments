@@ -21,39 +21,56 @@ extern uint64_t NUM_REGIONS;
 
 RenderingTile::RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const int64_t num_other_tiles,
 		const uint64_t charm_index)
-	: msg(new TileCompleteMessage(tile_x, tile_y, num_other_tiles)), shadow_rays_expected(TILE_W * TILE_H, 0),
-	shadow_rays_received(TILE_W * TILE_H, 0), primary_rays_expected(TILE_W * TILE_H, 1), charm_index(charm_index)
+	: msg(new TileCompleteMessage(tile_x, tile_y, num_other_tiles)),
+	primary_rays_expected(TILE_W * TILE_H, 1),
+	shadow_rays_expected(TILE_W * TILE_H, 0),
+	shadow_rays_received(TILE_W * TILE_H, 0),
+	secondary_rays_expected(TILE_W * TILE_H, 0),
+	secondary_rays_received(TILE_W * TILE_H, 0),
+	charm_index(charm_index)
 {}
-void RenderingTile::report_primary_ray(const uint64_t px, const uint64_t children, const glm::vec4 &result) {
+void RenderingTile::report_primary_ray(const uint64_t px, const uint64_t spawned_shadow_rays,
+		const uint64_t spawned_secondary_rays, const glm::vec4 &result)
+{
 	if (primary_rays_expected[px] == 0) {
 		throw std::runtime_error("Unexpected primary ray reported on tile! #"
 				+ std::to_string(msg->tile_id));
 	}
 	primary_rays_expected[px] -= 1;
-	shadow_rays_expected[px] += children;
-	if (children == 0) {
-		const size_t tx = px * 4;
-		for (size_t c = 0; c < 4; ++c) {
+	shadow_rays_expected[px] += spawned_shadow_rays;
+	secondary_rays_expected[px] += spawned_secondary_rays;
+
+	const size_t tx = px * 4;
+	// Primary rays will tell us the depth of the first hit point
+	msg->tile[tx + 3] = result.w;
+	if (spawned_shadow_rays + spawned_secondary_rays == 0) {
+		for (size_t c = 0; c < 3; ++c) {
 			msg->tile[tx + c] = result[c];
 		}
 	}
 }
-void RenderingTile::report(const uint64_t px, const glm::vec4 &result) {
+void RenderingTile::report_secondary_ray(const uint64_t px, const uint64_t spawned_shadow_rays) {
+	secondary_rays_received[px] += 1;
+	shadow_rays_expected[px] += spawned_shadow_rays;
+}
+void RenderingTile::report_shadow_ray(const uint64_t px, const glm::vec4 &result) {
 	const size_t tx = px * 4;
 	// TODO: This should turn into an accumulation where we know how many rays we sent
 	// for the pixel plus (optionally) the primary ray branch factor and we accumulate
 	// until we get all the results back then normalize the color values.
-	for (size_t c = 0; c < 4; ++c) {
-		msg->tile[tx + c] = result[c];
+	for (size_t c = 0; c < 3; ++c) {
+		msg->tile[tx + c] += result[c];
 	}
 	shadow_rays_received[px] += 1;
 }
 bool RenderingTile::complete() const {
-	const bool primary_done = *std::max_element(primary_rays_expected.begin(),
-			primary_rays_expected.end()) == 0;
+	const bool primary_done = std::all_of(primary_rays_expected.begin(), primary_rays_expected.end(),
+			[](const uint64_t &x) { return x == 0; });
+	const bool secondary_done = std::equal(secondary_rays_received.begin(), secondary_rays_received.end(),
+			secondary_rays_expected.begin());
 	const bool shadow_done = std::equal(shadow_rays_received.begin(), shadow_rays_received.end(),
 			shadow_rays_expected.begin());
-	return primary_done && shadow_done;
+	return primary_done && shadow_done && secondary_done;
 }
 
 Region::Region() : rng(std::random_device()()), bounds_received(0) {
@@ -277,10 +294,10 @@ void Region::report_ray(RayResultMessage *msg) {
 	}
 	switch (msg->type) {
 		case pt::RAY_TYPE::PRIMARY:
-			rt->second.report_primary_ray(msg->pixel, msg->children, msg->result);
+			rt->second.report_primary_ray(msg->pixel, msg->children, 0, msg->result);
 			break;
 		case pt::RAY_TYPE::SHADOW:
-			rt->second.report(msg->pixel, msg->result);
+			rt->second.report_shadow_ray(msg->pixel, msg->result);
 			break;
 		default:
 			std::cout << "Unhandled ray type in report_ray!\n";
@@ -346,14 +363,14 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 					if (next) {
 						thisProxy[next->owner].send_ray(new SendRayMessage(ray));
 					} else {
-						tile.report_primary_ray(pixel, 0, glm::vec4(integrator.background,
+						tile.report_primary_ray(pixel, 0, 0, glm::vec4(integrator.background,
 									std::numeric_limits<float>::max()));
 					}
 				} else if (result.shadow && glm::vec3(result.shadow->color) == glm::vec3(0.f)) {
-					tile.report_primary_ray(pixel, 0, result.shadow->color);
+					tile.report_primary_ray(pixel, 0, 0, result.shadow->color);
 				} else if (result.shadow) {
 					// Report that we've spawned a shadow ray and traverse it
-					tile.report_primary_ray(pixel, 1, glm::vec4(glm::vec3(0), ray.ray.t_max));
+					tile.report_primary_ray(pixel, 1, 0, glm::vec4(glm::vec3(0), ray.ray.t_max));
 
 					const pt::DistributedRegion *shadow_region = bvh.intersect(*result.shadow);
 					bool occluded = false;
@@ -370,11 +387,11 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 					// data on some other node which occludes and we need to ship the ray off.
 					// If there is no next region to traverse, the point is not occluded.
 					if (occluded || result.shadow->color.xyz() == glm::vec3(0)) {
-						tile.report(pixel, glm::vec4(glm::vec3(0), result.shadow->color.w));
+						tile.report_shadow_ray(pixel, glm::vec4(glm::vec3(0), result.shadow->color.w));
 					} else if (shadow_region) {
 						thisProxy[shadow_region->owner].send_ray(new SendRayMessage(*result.shadow));
 					} else {
-						tile.report(pixel, result.shadow->color);
+						tile.report_shadow_ray(pixel, result.shadow->color);
 					}
 				}
 			} else {
@@ -382,7 +399,7 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 				// so we can see it as being completed. TODO: expose background color
 				// from the integrator so we don't have a hardcoded 0 background which
 				// may not match the scene background
-				tile.report_primary_ray(pixel, 0, glm::vec4(integrator.background,
+				tile.report_primary_ray(pixel, 0, 0, glm::vec4(integrator.background,
 							std::numeric_limits<float>::infinity()));
 			}
 		}

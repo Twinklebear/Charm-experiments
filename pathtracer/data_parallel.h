@@ -27,11 +27,9 @@ struct RenderingTile {
 	TileCompleteMessage *msg;
 	// Count of how many results we're expecting back for each pixel in the tile.
 	// Once all entries are 0, this tile is finished.
-	// TODO: Split into primary/secondary rays expected and shadow rays received counters
-	// primary rays might be an awkward term here, since in the pathtracing case I'm referring
-	// really to "paths" received where it means the entire primary ray + secondaries which
-	// we count as one "path" which spawns some number of shadow rays.
-	std::vector<uint64_t> shadow_rays_expected, shadow_rays_received, primary_rays_expected;
+	std::vector<uint64_t> primary_rays_expected;
+	std::vector<uint64_t> shadow_rays_expected, shadow_rays_received;
+	std::vector<uint64_t> secondary_rays_expected, secondary_rays_received;
 	// For debugging, the index of the Charm++ region we're on
 	uint64_t charm_index;
 
@@ -41,11 +39,15 @@ struct RenderingTile {
 	/* Report a primary ray, informing the tile how many shadow test results to
 	 * expect for the pixel to determine completion. If the ray has no children
 	 * the result will be written to the tile
-	 * TODO: This dual-path method is confusing as hell. Split it up.
 	 */
-	void report_primary_ray(const uint64_t px, const uint64_t children, const glm::vec4 &result);
-	// Report a rendering result for some pixel in this tile, result = {R, G, B, Z}
-	void report(const uint64_t px, const glm::vec4 &result);
+	void report_primary_ray(const uint64_t px, const uint64_t spawned_shadow_rays,
+			const uint64_t spawned_secondary_rays, const glm::vec4 &result);
+	/* Report a secondary ray for some pixel in this tile, tells us if it spawned
+	 * any shadows rays which we should then expect shading results from
+	 */
+	void report_secondary_ray(const uint64_t px, const uint64_t spawned_shadow_rays);
+	// Report a shading result for some pixel in this tile, result = {R, G, B, Z}
+	void report_shadow_ray(const uint64_t px, const glm::vec4 &result);
 	bool complete() const;
 };
 
