@@ -40,6 +40,14 @@ struct BBox {
 		min = glm::min(min, b.min);
 		max = glm::max(max, b.max);
 	}
+	// Intersect this box with the other one
+	inline static BBox box_union(const BBox &a, const BBox &b) {
+		return BBox(glm::min(a.min, b.min), glm::max(a.max, b.max));
+	}
+	// Intersect this box with the other one
+	inline static BBox intersect(const BBox &a, const BBox &b) {
+		return BBox(glm::max(a.min, b.min), glm::min(a.max, b.max));
+	}
 	inline int max_extent() const {
 		const glm::vec3 d = max - min;
 		if (d.x >= d.y && d.x >= d.z) {
