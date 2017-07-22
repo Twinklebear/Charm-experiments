@@ -235,55 +235,10 @@ void Region::send_ray(SendRayMessage *msg) {
 			thisProxy[msg->ray.owner_id].report_ray(new RayResultMessage(glm::vec4(glm::vec3(0),
 						msg->ray.ray.t_max), msg->ray.tile, msg->ray.pixel,
 						msg->ray.type, 1));
-
-			const pt::DistributedRegion *shadow_region = bvh.intersect(*result.shadow);
-			bool occluded = false;
-			if (shadow_region && shadow_region->is_mine) {
-				occluded = integrator.occluded(*result.shadow);
-			}
-			// If our local data doesn't occlude the point, is there some other region that might?
-			if (!occluded) {
-				if (bvh.backtrack(*result.shadow)) {
-					shadow_region = bvh.intersect(*result.shadow);
-				}
-			}
-			// If we occluded it with local data, we're done. Otherwise there might be
-			// data on some other node which occludes and we need to ship the ray off.
-			// If there is no next region to traverse, the point is not occluded.
-			if (occluded || result.shadow->color.xyz() == glm::vec3(0)) {
-				thisProxy[result.shadow->owner_id].report_ray(new RayResultMessage(
-							glm::vec4(glm::vec3(0), result.shadow->color.w),
-							result.shadow->tile, result.shadow->pixel,
-							pt::RAY_TYPE::SHADOW, 0));
-			} else if (shadow_region) {
-				thisProxy[shadow_region->owner].send_ray(new SendRayMessage(*result.shadow));
-			} else {
-				thisProxy[result.shadow->owner_id].report_ray(new RayResultMessage(result.shadow->color,
-							result.shadow->tile, result.shadow->pixel, pt::RAY_TYPE::SHADOW, 0));
-			}
+			traverse_shadow_ray(*result.shadow);
 		}
 	} else if (msg->ray.type == pt::RAY_TYPE::SHADOW) {
-		bool occluded = integrator.occluded(msg->ray);
-		// If our local data doesn't occlude the point, is there some other region that might?
-		const pt::DistributedRegion *next = nullptr;
-		if (!occluded) {
-			if (bvh.backtrack(msg->ray)) {
-				next = bvh.intersect(msg->ray);
-			}
-		}
-		// If we occluded it with local data, we're done. Otherwise there might be
-		// data on some other node which occludes and we need to ship the ray off.
-		// If there is no next region to traverse, the point is not occluded.
-		if (occluded) {
-			thisProxy[msg->ray.owner_id].report_ray(new RayResultMessage(
-						glm::vec4(glm::vec3(0), msg->ray.color.w),
-						msg->ray.tile, msg->ray.pixel, msg->ray.type, 0));
-		} else if (next) {
-			thisProxy[next->owner].send_ray(new SendRayMessage(msg->ray));
-		} else {
-			thisProxy[msg->ray.owner_id].report_ray(new RayResultMessage(msg->ray.color,
-						msg->ray.tile, msg->ray.pixel, msg->ray.type, 0));
-		}
+		continue_shadow_ray(msg->ray, integrator.occluded(msg->ray));
 	}
 	delete msg;
 }
@@ -373,34 +328,11 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 							glm::vec4(glm::vec3(0), ray.ray.t_max));
 				}
 
-				// Traverse the secondary ray if we have one which will give non-block color
 				if (result.secondary) {
-					// TODO: Stubbed out for now.
-					tile.report_secondary_ray(pixel, 0);
+					traverse_secondary_ray(*result.secondary);
 				}
-				// Traverse the spawned shadow ray
 				if (result.shadow) {
-					const pt::DistributedRegion *shadow_region = bvh.intersect(*result.shadow);
-					bool occluded = false;
-					if (shadow_region && shadow_region->is_mine) {
-						occluded = integrator.occluded(*result.shadow);
-					}
-					// If our local data doesn't occlude the point, is there some other region that might?
-					if (!occluded) {
-						if (bvh.backtrack(*result.shadow)) {
-							shadow_region = bvh.intersect(*result.shadow);
-						}
-					}
-					// If we occluded it with local data, we're done. Otherwise there might be
-					// data on some other node which occludes and we need to ship the ray off.
-					// If there is no next region to traverse, the point is not occluded.
-					if (occluded || result.shadow->color.xyz() == glm::vec3(0)) {
-						tile.report_shadow_ray(pixel, glm::vec4(glm::vec3(0), result.shadow->color.w));
-					} else if (shadow_region) {
-						thisProxy[shadow_region->owner].send_ray(new SendRayMessage(*result.shadow));
-					} else {
-						tile.report_shadow_ray(pixel, result.shadow->color);
-					}
+					traverse_shadow_ray(*result.shadow, &tile);
 				}
 			} else {
 				// We don't own these pixels but still need to "finish" them on our local tile
@@ -409,6 +341,66 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 				// may not match the scene background
 				tile.report_primary_ray(pixel, 0, 0, glm::vec4(integrator.background,
 							std::numeric_limits<float>::infinity()));
+			}
+		}
+	}
+}
+void Region::traverse_secondary_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
+}
+void Region::traverse_shadow_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
+	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
+	// or at least keep the scene alive, since the Region may have multiple geometry
+	pt::WhittedIntegrator integrator(glm::vec3(0.05),
+		pt::Scene({my_object},
+			{
+				std::make_shared<pt::PointLight>(glm::vec3(1.5, 1.5, 1), glm::vec3(2)),
+			},
+			&bvh
+		));
+
+	const pt::DistributedRegion *shadow_region = bvh.intersect(ray);
+	bool occluded = false;
+	if (shadow_region && shadow_region->is_mine) {
+		occluded = integrator.occluded(ray);
+	}
+	if (!shadow_region) {
+		if (local_tile) {
+			local_tile->report_shadow_ray(ray.pixel, ray.color);
+		} else {
+			thisProxy[ray.owner_id].report_ray(new RayResultMessage(ray.color,
+						ray.tile, ray.pixel, ray.type, 0));
+		}
+	} else {
+		continue_shadow_ray(ray, occluded, local_tile);
+	}
+}
+void Region::continue_shadow_ray(pt::ActiveRay &ray, const bool occluded, RenderingTile *local_tile) {
+	// If we occluded it with local data, we're done. Otherwise there might be
+	// data on some other node which occludes and we need to ship the ray off.
+	// If there is no next region to traverse, the point is not occluded.
+	if (occluded) {
+		if (local_tile) {
+			local_tile->report_shadow_ray(ray.pixel, glm::vec4(glm::vec3(0), ray.color.w));
+		} else {
+			thisProxy[ray.owner_id].report_ray(new RayResultMessage(
+						glm::vec4(glm::vec3(0), ray.color.w),
+						ray.tile, ray.pixel, ray.type, 0));
+		}
+	} else {
+		// If our local data doesn't occlude the point, is there some other region that might?
+		const pt::DistributedRegion *next = nullptr;
+		if (bvh.backtrack(ray)) {
+			next = bvh.intersect(ray);
+		}
+
+		if (next) {
+			thisProxy[next->owner].send_ray(new SendRayMessage(ray));
+		} else {
+			if (local_tile) {
+				local_tile->report_shadow_ray(ray.pixel, ray.color);
+			} else {
+				thisProxy[ray.owner_id].report_ray(new RayResultMessage(ray.color,
+							ray.tile, ray.pixel, ray.type, 0));
 			}
 		}
 	}
