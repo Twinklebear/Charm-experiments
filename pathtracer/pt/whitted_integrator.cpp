@@ -30,14 +30,12 @@ IntersectionResult WhittedIntegrator::integrate(ActiveRay &ray) const {
 				// which more often than not will likely be the case (I'd guess?). Only after missing
 				// our local geometry we then need to see if it should be sent to other regions in the
 				// region BVH
-				//if (glm::dot(light_sample.dir, dg.normal) > 0.0) {
-					result.shadow = std::unique_ptr<ActiveRay>(ActiveRay::shadow(light_sample.occlusion_ray, ray));
-					const glm::vec3 color = dg.brdf->eval(w_i, w_o) * light_sample.illum 
-						* std::max(glm::dot(light_sample.dir, dg.normal), 0.f);
-					result.shadow->color.x = color.x;
-					result.shadow->color.y = color.y;
-					result.shadow->color.z = color.z;
-				//}
+				result.shadow = std::unique_ptr<ActiveRay>(ActiveRay::shadow(light_sample.occlusion_ray, ray));
+				const glm::vec3 color = dg.brdf->eval(w_i, w_o) * light_sample.illum 
+					* std::max(glm::dot(light_sample.dir, dg.normal), 0.f);
+				result.shadow->color.x = color.x;
+				result.shadow->color.y = color.y;
+				result.shadow->color.z = color.z;
 			}
 		} else if (ray.ray.depth < 6) {
 #if 0

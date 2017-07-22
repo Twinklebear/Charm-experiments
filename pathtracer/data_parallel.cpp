@@ -349,6 +349,8 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 						tile.report_primary_ray(pixel, 0, glm::vec4(integrator.background,
 									std::numeric_limits<float>::max()));
 					}
+				} else if (result.shadow && glm::vec3(result.shadow->color) == glm::vec3(0.f)) {
+					tile.report_primary_ray(pixel, 0, result.shadow->color);
 				} else if (result.shadow) {
 					// Report that we've spawned a shadow ray and traverse it
 					tile.report_primary_ray(pixel, 1, glm::vec4(glm::vec3(0), ray.ray.t_max));
