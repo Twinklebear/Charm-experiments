@@ -360,18 +360,26 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 					if (bvh.backtrack(ray)) {
 						next = bvh.intersect(ray);
 					}
-					if (next) {
+					if (result.any_hit) {
+						tile.report_primary_ray(pixel, 0, 0, glm::vec4(0.0, 0.0, 0.0, ray.ray.t_max));
+					} else if (next) {
 						thisProxy[next->owner].send_ray(new SendRayMessage(ray));
 					} else {
 						tile.report_primary_ray(pixel, 0, 0, glm::vec4(integrator.background,
 									std::numeric_limits<float>::max()));
 					}
-				} else if (result.shadow && glm::vec3(result.shadow->color) == glm::vec3(0.f)) {
-					tile.report_primary_ray(pixel, 0, 0, result.shadow->color);
-				} else if (result.shadow) {
-					// Report that we've spawned a shadow ray and traverse it
-					tile.report_primary_ray(pixel, 1, 0, glm::vec4(glm::vec3(0), ray.ray.t_max));
+				} else {
+					tile.report_primary_ray(pixel, result.shadow ? 1 : 0, result.secondary ? 1 : 0,
+							glm::vec4(glm::vec3(0), ray.ray.t_max));
+				}
 
+				// Traverse the secondary ray if we have one which will give non-block color
+				if (result.secondary) {
+					// TODO: Stubbed out for now.
+					tile.report_secondary_ray(pixel, 0);
+				}
+				// Traverse the spawned shadow ray
+				if (result.shadow) {
 					const pt::DistributedRegion *shadow_region = bvh.intersect(*result.shadow);
 					bool occluded = false;
 					if (shadow_region && shadow_region->is_mine) {

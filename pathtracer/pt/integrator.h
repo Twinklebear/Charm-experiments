@@ -47,6 +47,7 @@ struct ActiveRay {
 };
 
 struct IntersectionResult {
+	bool any_hit = false;
 	// TODO: For the shadow ray, I can compute the entire shading
 	// result that would be sent because all nodes have all the light
 	// information, since they're delta or analytic lights. The only
