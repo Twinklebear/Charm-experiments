@@ -45,7 +45,8 @@ struct RenderingTile {
 	/* Report a secondary ray for some pixel in this tile, tells us if it spawned
 	 * any shadows rays which we should then expect shading results from
 	 */
-	void report_secondary_ray(const uint64_t px, const uint64_t spawned_shadow_rays);
+	void report_secondary_ray(const uint64_t px, const uint64_t spawned_shadow_rays,
+			const uint64_t spawned_secondary_rays);
 	// Report a shading result for some pixel in this tile, result = {R, G, B, Z}
 	void report_shadow_ray(const uint64_t px, const glm::vec4 &result);
 	bool complete() const;
@@ -93,16 +94,21 @@ private:
 	// Render a tile of the image to the tile passed
 	void render_tile(RenderingTile &tile, const uint64_t start_x, const uint64_t start_y,
 			const uint64_t tile_id, const std::set<size_t> &regions_in_tile);
-	/* Traverse a newly spawned secondary ray through this node's data, potentially
+	/* Traverse a newly spawned primary/secondary ray through this node's data, potentially
 	 * spawning shadow and secondary rays, or simply continuing it on to
 	 * another node
 	 */
-	void traverse_secondary_ray(pt::ActiveRay &ray, RenderingTile *local_tile = nullptr);
+	void traverse_ray(pt::ActiveRay &ray, RenderingTile *local_tile = nullptr);
+	/* Continue a primary/secondary ray through this node's data, potentially
+	 * spawning shadow and secondary rays, or simply continuing it on to
+	 * another node
+	 */
+	void continue_ray(pt::ActiveRay &ray, RenderingTile *local_tile = nullptr);
 	/* Traverse a newly spawned shadow ray through this node's data, potentially
 	 * shading the ray, or continuing it on
 	 */
 	void traverse_shadow_ray(pt::ActiveRay &ray, RenderingTile *local_tile = nullptr);
-	/* Traverse a newly spawned shadow ray through this node's data, potentially
+	/* Continue a shadow ray through this node's data, potentially
 	 * shading the ray, or continuing it on
 	 */
 	void continue_shadow_ray(pt::ActiveRay &ray, const bool occluded, RenderingTile *local_tile = nullptr);
@@ -170,10 +176,10 @@ public:
 	pt::RAY_TYPE type;
 	// If this ray is a primary ray or "path", this is the # of shadow
 	// rays spawned along this path we should expect to get results from
-	uint64_t children;
+	uint64_t shadow_children, secondary_children;
 
 	RayResultMessage(const glm::vec4 &result, uint64_t tile, uint64_t pixel,
-			pt::RAY_TYPE type, uint64_t children);
+			pt::RAY_TYPE type, uint64_t shadow_children, uint64_t secondary_children);
 	void msg_pup(PUP::er &p);
 };
 
