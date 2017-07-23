@@ -9,8 +9,8 @@ BVHTraversalState::BVHTraversalState() : current(0), bitstack(0) {}
 
 ActiveRay::ActiveRay(const Ray &r, const uint64_t owner_id, const uint64_t tile,
 		const uint64_t pixel)
-	: type(PRIMARY), ray(r), owner_id(owner_id), tile(tile), pixel(pixel),
-	children(0)
+	: type(PRIMARY), ray(r), color(glm::vec3(0), r.t_max), owner_id(owner_id),
+	tile(tile), pixel(pixel), children(0)
 {}
 ActiveRay* ActiveRay::shadow(const Ray &r, const ActiveRay &parent) {
 	ActiveRay *ar = new ActiveRay(r, parent.owner_id, parent.tile, parent.pixel);
@@ -28,6 +28,8 @@ ActiveRay* ActiveRay::secondary(const Ray &r, const ActiveRay &parent) {
 	ar->ray = r;
 	return ar;
 }
+
+IntersectionResult::IntersectionResult() : any_hit(false) {}
 
 }
 

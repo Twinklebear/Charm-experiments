@@ -47,13 +47,15 @@ struct ActiveRay {
 };
 
 struct IntersectionResult {
-	bool any_hit = false;
+	bool any_hit;
 	// TODO: For the shadow ray, I can compute the entire shading
 	// result that would be sent because all nodes have all the light
 	// information, since they're delta or analytic lights. The only
 	// thing a node doesn't know is if there's some geometry on another
 	// node blocking its shading point from the light.
 	std::unique_ptr<ActiveRay> shadow, secondary;
+
+	IntersectionResult();
 };
 
 }
