@@ -66,6 +66,7 @@ class Region : public CBase_Region {
 	std::vector<pt::BBox> other_bounds, other_screen_bounds;
 	std::vector<pt::DistributedRegion> world;
 	pt::BVH bvh;
+	std::unique_ptr<pt::WhittedIntegrator> integrator;
 	// Tile's we're actively rendering or waiting for results back from
 	// other nodes to complete rendering.
 	std::unordered_map<size_t, RenderingTile> rendering_tiles;

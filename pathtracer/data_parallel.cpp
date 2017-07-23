@@ -19,7 +19,7 @@ extern uint64_t TILE_W;
 extern uint64_t TILE_H;
 extern uint64_t NUM_REGIONS;
 
-static const glm::vec3 POINT_LIGHT_POS(1.5, 1.5, 0);
+static const glm::vec3 POINT_LIGHT_POS(1.5, 1.5, 1);
 
 RenderingTile::RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const int64_t num_other_tiles,
 		const uint64_t charm_index)
@@ -85,17 +85,17 @@ Region::Region() : rng(std::random_device()()), bounds_received(0) {
 	} else if (thisIndex == 1) {
 		std::shared_ptr<pt::BxDF> red_mat = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
 		//std::shared_ptr<pt::BxDF> red_mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.8, 0.1, 0.1));
-		my_object = std::make_shared<pt::Sphere>(glm::vec3(0), 0.7, red_mat);
+		my_object = std::make_shared<pt::Sphere>(glm::vec3(0.25), 0.7, red_mat);
 	} else {
 		std::shared_ptr<pt::BxDF> lambertian_blue = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
-		my_object = std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.5, 0), 0.25, lambertian_blue);
+		my_object = std::make_shared<pt::Sphere>(glm::vec3(1.5, 0.5, 0), 0.2, lambertian_blue);
 	}
 	other_bounds.resize(NUM_REGIONS);
 	world.resize(NUM_REGIONS);
 }
 Region::Region(CkMigrateMessage *msg) : rng(std::random_device()()), bounds_received(0) {
-	CkPrintf("Region doesn't support migration!\n");
 	delete msg;
+	throw std::runtime_error("Region doesn't support migration!");
 }
 void Region::load() {
 	if (NUM_REGIONS == 1) {
@@ -127,6 +127,16 @@ void Region::send_bounds(BoundsMessage *msg) {
 		std::transform(world.begin(), world.end(), std::back_inserter(world_ptrs),
 				[](const pt::DistributedRegion &a) { return &a; });
 		bvh = pt::BVH(world_ptrs);
+
+		// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
+		// or at least keep the scene alive, since the Region may have multiple geometry
+		integrator = std::unique_ptr<pt::WhittedIntegrator>(new pt::WhittedIntegrator(glm::vec3(0.05),
+			pt::Scene({my_object},
+			{
+				std::make_shared<pt::PointLight>(POINT_LIGHT_POS, glm::vec3(2)),
+			},
+			&bvh
+		)));
 		main_proxy.region_loaded();
 	}
 }
@@ -197,16 +207,6 @@ void Region::render() {
 	}
 }
 void Region::send_ray(SendRayMessage *msg) {
-	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
-	// or at least keep the scene alive, since the Region may have multiple geometry
-	pt::WhittedIntegrator integrator(glm::vec3(0.05),
-		pt::Scene({my_object},
-			{
-				std::make_shared<pt::PointLight>(POINT_LIGHT_POS, glm::vec3(2)),
-			},
-			&bvh
-		));
-
 	/* Reporting rays:
 	 * - PRIMARY with no results: We didn't hit anything.
 	 *   	1. Send back the background color and 0 kids to tell the owner the ray is done.
@@ -220,7 +220,7 @@ void Region::send_ray(SendRayMessage *msg) {
 	 *   	1. Send the owner back black for the shading result.
 	 */
 	if (msg->ray.type == pt::RAY_TYPE::SHADOW) {
-		continue_shadow_ray(msg->ray, integrator.occluded(msg->ray));
+		continue_shadow_ray(msg->ray, integrator->occluded(msg->ray));
 	} else {
 		continue_ray(msg->ray);
 	}
@@ -258,13 +258,6 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
 	// or at least keep the scene alive, since the Region may have multiple geometry
 	const pt::Camera camera(scene->cam_pos, scene->cam_target, scene->cam_up, 65.0, IMAGE_W, IMAGE_H);
-	pt::WhittedIntegrator integrator(glm::vec3(0.05),
-		pt::Scene({my_object},
-			{
-				std::make_shared<pt::PointLight>(POINT_LIGHT_POS, glm::vec3(2)),
-			},
-			&bvh
-		));
 	// We use a separate rng for primary ray directions so
 	// that all regions will see the same ray directions for
 	// each tile when testing who is first. TODO: in future send
@@ -294,23 +287,13 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 			} else {
 				// We don't own these pixels but still need to finish them on our local tile
 				// so we can see it as being completed
-				tile.report_primary_ray(pixel, 0, 0, glm::vec4(integrator.background,
+				tile.report_primary_ray(pixel, 0, 0, glm::vec4(integrator->background,
 							std::numeric_limits<float>::infinity()));
 			}
 		}
 	}
 }
 void Region::traverse_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
-	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
-	// or at least keep the scene alive, since the Region may have multiple geometry
-	pt::WhittedIntegrator integrator(glm::vec3(0.05),
-		pt::Scene({my_object},
-			{
-				std::make_shared<pt::PointLight>(POINT_LIGHT_POS, glm::vec3(2)),
-			},
-			&bvh
-		));
-
 	const pt::DistributedRegion *region = bvh.intersect(ray);
 	if (region && region->is_mine) {
 		continue_ray(ray, local_tile);
@@ -320,29 +303,19 @@ void Region::traverse_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
 		if (local_tile) {
 			if (ray.type == pt::RAY_TYPE::PRIMARY) {
 				local_tile->report_primary_ray(ray.pixel, 0, 0,
-						glm::vec4(integrator.background, ray.ray.t_max));
+						glm::vec4(integrator->background, ray.ray.t_max));
 			} else {
 				local_tile->report_secondary_ray(ray.pixel, 0, 0);
 			}
 		} else {
 			thisProxy[ray.owner_id].report_ray(new RayResultMessage(
-						glm::vec4(integrator.background, ray.ray.t_max),
+						glm::vec4(integrator->background, ray.ray.t_max),
 						ray.tile, ray.pixel, ray.type, 0, 0));
 		}
 	}
 }
 void Region::continue_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
-	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
-	// or at least keep the scene alive, since the Region may have multiple geometry
-	pt::WhittedIntegrator integrator(glm::vec3(0.05),
-		pt::Scene({my_object},
-			{
-				std::make_shared<pt::PointLight>(POINT_LIGHT_POS, glm::vec3(2)),
-			},
-			&bvh
-		));
-
-	pt::IntersectionResult result = integrator.integrate(ray);
+	pt::IntersectionResult result = integrator->integrate(ray);
 	if (!result.shadow && !result.secondary) {
 		// Backtrack in the BVH and ship the ray off to the next region it needs to
 		// traverse, if there is no next region send the background color back
@@ -353,7 +326,7 @@ void Region::continue_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
 		if (next) {
 			thisProxy[next->owner].send_ray(new SendRayMessage(ray));
 		} else {
-			glm::vec4 primary_color(integrator.background, std::numeric_limits<float>::infinity());
+			glm::vec4 primary_color(integrator->background, std::numeric_limits<float>::infinity());
 			// If there was an earlier hit along this ray, don't trample the results
 			if (!std::isinf(ray.color.w)) {
 				primary_color = ray.color;
@@ -398,20 +371,10 @@ void Region::continue_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
 	}
 }
 void Region::traverse_shadow_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
-	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
-	// or at least keep the scene alive, since the Region may have multiple geometry
-	pt::WhittedIntegrator integrator(glm::vec3(0.05),
-		pt::Scene({my_object},
-			{
-				std::make_shared<pt::PointLight>(POINT_LIGHT_POS, glm::vec3(2)),
-			},
-			&bvh
-		));
-
 	const pt::DistributedRegion *shadow_region = bvh.intersect(ray);
 	bool occluded = false;
 	if (shadow_region && shadow_region->is_mine) {
-		occluded = integrator.occluded(ray);
+		occluded = integrator->occluded(ray);
 	}
 	if (!shadow_region) {
 		if (local_tile) {
