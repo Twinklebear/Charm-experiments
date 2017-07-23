@@ -4,7 +4,7 @@ namespace pt {
 
 Plane::Plane(const glm::vec3 &center, const glm::vec3 &normal, float half_length,
 		std::shared_ptr<BxDF> &brdf)
-	: Geometry(brdf), center(center), normal(normal), half_length(half_length)
+	: Geometry(brdf), center(center), normal(glm::normalize(normal)), half_length(half_length)
 {}
 bool Plane::intersect(Ray &ray, DifferentialGeometry &dg) const {
 	const float d = -glm::dot(center, normal);
@@ -38,8 +38,8 @@ bool Plane::intersect(Ray &ray, DifferentialGeometry &dg) const {
 BBox Plane::bounds() const {
 	glm::vec3 tan, bitan;
 	coordinate_system(normal, tan, bitan);
-	const glm::vec3 min_pt = center - half_length * tan - half_length * bitan;
-	const glm::vec3 max_pt = center + half_length * tan + half_length * bitan;
+	const glm::vec3 min_pt = center - half_length * tan - half_length * bitan - 0.001 * normal;
+	const glm::vec3 max_pt = center + half_length * tan + half_length * bitan + 0.001 * normal;
 	return BBox(glm::min(min_pt, max_pt), glm::max(min_pt, max_pt));
 }
 
