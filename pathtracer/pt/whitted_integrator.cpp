@@ -15,6 +15,8 @@ IntersectionResult WhittedIntegrator::integrate(ActiveRay &ray) const {
 	DifferentialGeometry dg;
 	if (scene.intersect(ray.ray, dg)) {
 		result.any_hit = true;
+		ray.color.w = ray.ray.t_max;
+
 		glm::vec3 lighting(0);
 		dg.orthonormalize();
 		const glm::vec3 w_o = dg.to_shading(-ray.ray.dir);
