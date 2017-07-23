@@ -339,9 +339,6 @@ void Region::continue_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
 			&bvh
 		));
 
-	// TODO: Skipping the pointless shadow ray for the black/back-face of the red-sphere
-	// is broken for some reason in this code. Seems like the "any_hit" isn't true?
-	// Dunno whatever the hell is going on.
 	pt::IntersectionResult result = integrator.integrate(ray);
 	if (!result.shadow && !result.secondary) {
 		// Backtrack in the BVH and ship the ray off to the next region it needs to
@@ -353,9 +350,12 @@ void Region::continue_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
 		if (next) {
 			thisProxy[next->owner].send_ray(new SendRayMessage(ray));
 		} else {
-			glm::vec4 primary_color(integrator.background, ray.ray.t_max);
-			if (result.any_hit) {
-				primary_color = glm::vec4(glm::vec3(0), ray.ray.t_max);
+			glm::vec4 primary_color(integrator.background, std::numeric_limits<float>::infinity());
+			// If there was an earlier hit along this ray, don't trample the results
+			if (!std::isinf(ray.color.w)) {
+				primary_color = ray.color;
+			} else if (result.any_hit) {
+				primary_color = glm::vec4(glm::vec3(0), ray.color.w);
 			}
 			if (local_tile) {
 				if (ray.type == pt::RAY_TYPE::PRIMARY) {
@@ -369,8 +369,8 @@ void Region::continue_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
 			}
 		}
 	} else {
-		const uint64_t shadow_child = result.shadow ? 1 : 0; 
-		const uint64_t secondary_child = result.secondary ? 1 : 0; 
+		const uint64_t shadow_child = result.shadow ? 1 : 0;
+		const uint64_t secondary_child = result.secondary ? 1 : 0;
 		// Report what we've spawned to the owner
 		if (local_tile) {
 			if (ray.type == pt::RAY_TYPE::PRIMARY) {
