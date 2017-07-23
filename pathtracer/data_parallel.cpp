@@ -19,6 +19,8 @@ extern uint64_t TILE_W;
 extern uint64_t TILE_H;
 extern uint64_t NUM_REGIONS;
 
+static const glm::vec3 POINT_LIGHT_POS(1.5, 1.5, 0);
+
 RenderingTile::RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const int64_t num_other_tiles,
 		const uint64_t charm_index)
 	: msg(new TileCompleteMessage(tile_x, tile_y, num_other_tiles)),
@@ -78,14 +80,15 @@ bool RenderingTile::complete() const {
 Region::Region() : rng(std::random_device()()), bounds_received(0) {
 	if (thisIndex == 0) {
 		std::shared_ptr<pt::BxDF> lambertian_green = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.8, 0.1));
-		my_object = std::make_shared<pt::Plane>(glm::vec3(0), glm::vec3(0, 1, 1), 10,
+		my_object = std::make_shared<pt::Plane>(glm::vec3(0), glm::vec3(0, 1, 0), 4,
 				lambertian_green);
 	} else if (thisIndex == 1) {
-		std::shared_ptr<pt::BxDF> lambertian_red = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
-		my_object = std::make_shared<pt::Sphere>(glm::vec3(0), 0.7, lambertian_red);
+		std::shared_ptr<pt::BxDF> red_mat = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
+		//std::shared_ptr<pt::BxDF> red_mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.8, 0.1, 0.1));
+		my_object = std::make_shared<pt::Sphere>(glm::vec3(0), 0.7, red_mat);
 	} else {
 		std::shared_ptr<pt::BxDF> lambertian_blue = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
-		my_object = std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.5, 0.5), 0.25, lambertian_blue);
+		my_object = std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.5, 0), 0.25, lambertian_blue);
 	}
 	other_bounds.resize(NUM_REGIONS);
 	world.resize(NUM_REGIONS);
@@ -199,7 +202,7 @@ void Region::send_ray(SendRayMessage *msg) {
 	pt::WhittedIntegrator integrator(glm::vec3(0.05),
 		pt::Scene({my_object},
 			{
-				std::make_shared<pt::PointLight>(glm::vec3(1.5, 1.5, 1), glm::vec3(2)),
+				std::make_shared<pt::PointLight>(POINT_LIGHT_POS, glm::vec3(2)),
 			},
 			&bvh
 		));
@@ -258,7 +261,7 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 	pt::WhittedIntegrator integrator(glm::vec3(0.05),
 		pt::Scene({my_object},
 			{
-				std::make_shared<pt::PointLight>(glm::vec3(1.5, 1.5, 1), glm::vec3(2)),
+				std::make_shared<pt::PointLight>(POINT_LIGHT_POS, glm::vec3(2)),
 			},
 			&bvh
 		));
@@ -303,7 +306,7 @@ void Region::traverse_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
 	pt::WhittedIntegrator integrator(glm::vec3(0.05),
 		pt::Scene({my_object},
 			{
-				std::make_shared<pt::PointLight>(glm::vec3(1.5, 1.5, 1), glm::vec3(2)),
+				std::make_shared<pt::PointLight>(POINT_LIGHT_POS, glm::vec3(2)),
 			},
 			&bvh
 		));
@@ -334,7 +337,7 @@ void Region::continue_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
 	pt::WhittedIntegrator integrator(glm::vec3(0.05),
 		pt::Scene({my_object},
 			{
-				std::make_shared<pt::PointLight>(glm::vec3(1.5, 1.5, 1), glm::vec3(2)),
+				std::make_shared<pt::PointLight>(POINT_LIGHT_POS, glm::vec3(2)),
 			},
 			&bvh
 		));
@@ -400,7 +403,7 @@ void Region::traverse_shadow_ray(pt::ActiveRay &ray, RenderingTile *local_tile) 
 	pt::WhittedIntegrator integrator(glm::vec3(0.05),
 		pt::Scene({my_object},
 			{
-				std::make_shared<pt::PointLight>(glm::vec3(1.5, 1.5, 1), glm::vec3(2)),
+				std::make_shared<pt::PointLight>(POINT_LIGHT_POS, glm::vec3(2)),
 			},
 			&bvh
 		));
