@@ -43,10 +43,12 @@ struct RenderingTile {
 	void report_primary_ray(const uint64_t px, const uint64_t spawned_shadow_rays,
 			const uint64_t spawned_secondary_rays, const glm::vec4 &result);
 	/* Report a secondary ray for some pixel in this tile, tells us if it spawned
-	 * any shadows rays which we should then expect shading results from
+	 * any shadows rays which we should then expect shading results from.
+	 * In the case a secondary ray didn't hit anything (spawned no shadow rays)
+	 * we treat it as a shadow and shade with the result color passed.
 	 */
 	void report_secondary_ray(const uint64_t px, const uint64_t spawned_shadow_rays,
-			const uint64_t spawned_secondary_rays);
+			const uint64_t spawned_secondary_rays, const glm::vec3 &result);
 	// Report a shading result for some pixel in this tile
 	void report_shadow_ray(const uint64_t px, const glm::vec3 &result);
 	bool complete() const;

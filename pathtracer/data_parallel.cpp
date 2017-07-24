@@ -52,10 +52,17 @@ void RenderingTile::report_primary_ray(const uint64_t px, const uint64_t spawned
 	}
 }
 void RenderingTile::report_secondary_ray(const uint64_t px, const uint64_t spawned_shadow_rays,
-		const uint64_t spawned_secondary_rays) {
+		const uint64_t spawned_secondary_rays, const glm::vec3 &result) {
 	secondary_rays_received[px] += 1;
 	secondary_rays_expected[px] += spawned_secondary_rays;
 	shadow_rays_expected[px] += spawned_shadow_rays;
+
+	if (spawned_shadow_rays + spawned_secondary_rays == 0) {
+		const size_t tx = px * 4;
+		for (size_t c = 0; c < 3; ++c) {
+			msg->tile[tx + c] += result[c];
+		}
+	}
 }
 void RenderingTile::report_shadow_ray(const uint64_t px, const glm::vec3 &result) {
 	const size_t tx = px * 4;
@@ -79,17 +86,22 @@ bool RenderingTile::complete() const {
 
 Region::Region() : rng(std::random_device()()), bounds_received(0) {
 	if (thisIndex == 0) {
-		std::shared_ptr<pt::BxDF> lambertian_green = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.8, 0.1));
-		my_object = std::make_shared<pt::Plane>(glm::vec3(0), glm::vec3(0, 1, 0), 4,
-				lambertian_green);
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.8, 0.1));
+		my_object = std::make_shared<pt::Plane>(glm::vec3(0), glm::vec3(0, 1, 0), 4, mat);
 	} else if (thisIndex == 1) {
-		std::shared_ptr<pt::BxDF> red_mat = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
-	//	std::shared_ptr<pt::BxDF> red_mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.8, 0.1, 0.1));
-		my_object = std::make_shared<pt::Sphere>(glm::vec3(0, 0.4, 0), 0.5, red_mat);
+		//std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.8, 0.1, 0.1));
+		my_object = std::make_shared<pt::Sphere>(glm::vec3(0, 0.4, 0), 0.7, mat);
+	} else if (thisIndex == 2) {
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
+		my_object = std::make_shared<pt::Sphere>(glm::vec3(1, 0.5, 0.5), 0.2, mat);
+	} else if (thisIndex == 3) {
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(1));
+		my_object = std::make_shared<pt::Plane>(glm::vec3(0, 0, -4), glm::vec3(0, 0, 1), 4, mat);
 	} else {
-		std::shared_ptr<pt::BxDF> lambertian_blue = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
-		my_object = std::make_shared<pt::Sphere>(glm::vec3(0.4, 0.5, 0.5), 0.2, lambertian_blue);
+		throw std::runtime_error("too many test regions!");
 	}
+
 	other_bounds.resize(NUM_REGIONS);
 	world.resize(NUM_REGIONS);
 }
@@ -238,7 +250,7 @@ void Region::report_ray(RayResultMessage *msg) {
 			break;
 		case pt::RAY_TYPE::SECONDARY:
 			rt->second.report_secondary_ray(msg->pixel, msg->shadow_children,
-					msg->secondary_children);
+					msg->secondary_children, msg->result);
 			break;
 		case pt::RAY_TYPE::SHADOW:
 			rt->second.report_shadow_ray(msg->pixel, glm::vec3(msg->result));
@@ -272,7 +284,7 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 			const uint64_t pixel = i * TILE_W + j;
 			const pt::Ray cam_ray = camera.generate_ray(px, py,
 					{real_distrib(ray_dir_rng), real_distrib(ray_dir_rng)});
-			pt::ActiveRay ray(cam_ray, thisIndex, tile.msg->tile_id, pixel);
+			pt::ActiveRay ray(cam_ray, thisIndex, tile.msg->tile_id, pixel, glm::vec3(1));
 
 			const pt::DistributedRegion *first_region = bvh.intersect(ray);
 			while (first_region && !first_region->is_mine) {
@@ -300,17 +312,16 @@ void Region::traverse_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
 	} else if (region) {
 		thisProxy[region->owner].send_ray(new SendRayMessage(ray));
 	} else {
+		const glm::vec4 result_color(integrator->background * ray.throughput, ray.ray.t_max);
 		if (local_tile) {
 			if (ray.type == pt::RAY_TYPE::PRIMARY) {
-				local_tile->report_primary_ray(ray.pixel, 0, 0,
-						glm::vec4(integrator->background, ray.ray.t_max));
+				local_tile->report_primary_ray(ray.pixel, 0, 0, result_color);
 			} else {
-				local_tile->report_secondary_ray(ray.pixel, 0, 0);
+				local_tile->report_secondary_ray(ray.pixel, 0, 0, glm::vec3(result_color));
 			}
 		} else {
 			thisProxy[ray.owner_id].report_ray(new RayResultMessage(
-						glm::vec4(integrator->background, ray.ray.t_max),
-						ray.tile, ray.pixel, ray.type, 0, 0));
+						result_color, ray.tile, ray.pixel, ray.type, 0, 0));
 		}
 	}
 }
@@ -328,39 +339,39 @@ void Region::continue_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
 		if (next) {
 			thisProxy[next->owner].send_ray(new SendRayMessage(ray));
 		} else {
-			glm::vec4 primary_color(integrator->background, std::numeric_limits<float>::infinity());
+			glm::vec4 result_color(integrator->background * ray.throughput, ray.ray.t_max);
 			// If there was an earlier hit along this ray, don't trample the results
-			if (!std::isinf(ray.ray.t_max)) {
-				primary_color = glm::vec4(ray.color, ray.ray.t_max);
-			} else if (result.any_hit) {
-				primary_color = glm::vec4(glm::vec3(0), ray.ray.t_max);
+			if (std::isinf(ray.ray.t_max) && result.any_hit) {
+				result_color = glm::vec4(glm::vec3(0), ray.ray.t_max);
 			}
+
 			if (local_tile) {
 				if (ray.type == pt::RAY_TYPE::PRIMARY) {
-					local_tile->report_primary_ray(ray.pixel, 0, 0, primary_color);
+					local_tile->report_primary_ray(ray.pixel, 0, 0, result_color);
 				} else {
-					local_tile->report_secondary_ray(ray.pixel, 0, 0);
+					local_tile->report_secondary_ray(ray.pixel, 0, 0, result_color);
 				}
 			} else {
 				thisProxy[ray.owner_id].report_ray(new RayResultMessage(
-							primary_color, ray.tile, ray.pixel, ray.type, 0, 0));
+							result_color, ray.tile, ray.pixel, ray.type, 0, 0));
 			}
 		}
 	} else {
 		const uint64_t shadow_child = result.shadow ? 1 : 0;
 		const uint64_t secondary_child = result.secondary ? 1 : 0;
 		// Report what we've spawned to the owner
+		glm::vec4 result_color(glm::vec3(0), ray.ray.t_max);
 		if (local_tile) {
 			if (ray.type == pt::RAY_TYPE::PRIMARY) {
-				local_tile->report_primary_ray(ray.pixel, shadow_child, secondary_child,
-						glm::vec4(glm::vec3(0), ray.ray.t_max));
+				local_tile->report_primary_ray(ray.pixel, shadow_child,
+						secondary_child, result_color);
 			} else {
-				local_tile->report_secondary_ray(ray.pixel, shadow_child, secondary_child);
+				local_tile->report_secondary_ray(ray.pixel, shadow_child,
+						secondary_child, result_color);
 			}
 		} else {
 			thisProxy[ray.owner_id].report_ray(new RayResultMessage(
-						glm::vec4(glm::vec3(0), ray.ray.t_max),
-						ray.tile, ray.pixel, ray.type,
+						result_color, ray.tile, ray.pixel, ray.type,
 						shadow_child, secondary_child));
 		}
 	}
@@ -492,7 +503,7 @@ TileCompleteMessage* TileCompleteMessage::unpack(void *buf) {
 	return msg;
 }
 
-SendRayMessage::SendRayMessage() : ray(pt::Ray(glm::vec3(NAN), glm::vec3(NAN)), 0, 0, 0) {}
+SendRayMessage::SendRayMessage() : ray(pt::Ray(glm::vec3(NAN), glm::vec3(NAN)), 0, 0, 0, glm::vec3(NAN)) {}
 SendRayMessage::SendRayMessage(const pt::ActiveRay &ray) : ray(ray) {}
 void SendRayMessage::msg_pup(PUP::er &p) {
 	int ray_type = ray.type;
@@ -502,6 +513,7 @@ void SendRayMessage::msg_pup(PUP::er &p) {
 	p | ray.traversal.current;
 	p | ray.traversal.bitstack;
 	p | ray.color;
+	p | ray.throughput;
 	p | ray.owner_id;
 	p | ray.tile;
 	p | ray.pixel;
