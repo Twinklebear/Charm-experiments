@@ -15,7 +15,6 @@ bool Plane::intersect(Ray &ray, DifferentialGeometry &dg) const {
 
 	const float t = -(glm::dot(ray.origin, normal) + d) / v;
 	if (t > ray.t_min && t < ray.t_max){
-		ray.t_max = t;
 		const glm::vec3 pt = ray.origin + ray.dir * t;
 		// Compute the tangent and bitangent
 		glm::vec3 tan, bitan;
@@ -23,6 +22,7 @@ bool Plane::intersect(Ray &ray, DifferentialGeometry &dg) const {
 		if (std::abs(glm::dot(pt - center, tan)) <= half_length
 			&& std::abs(glm::dot(pt - center, bitan)) <= half_length)
 		{
+			ray.t_max = t;
 			dg.point = pt;
 			dg.normal = normal;
 			dg.brdf = brdf.get();
