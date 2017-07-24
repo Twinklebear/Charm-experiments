@@ -84,17 +84,24 @@ public:
 			= std::vector<const DistributedRegion*>{});
 	// Get the bounds for the BVH
 	BBox bounds() const;
-	/* Intersect the regions in the BVH, resuming from the existing
-	 * traversal state passed. Returns the distributed region that
+	/* Perform the initial intersection test of regions in the BVH.
+	 * Returns the distributed region that
 	 * the ray should be sent to next, or nullptr if none.
 	 */
 	const DistributedRegion* intersect(ActiveRay &ray) const;
+	/* Continue traversing the ray through the BVH, resuming from the existing
+	 * traversal state passed. Returns the distributed region that
+	 * the ray should be sent to next, or nullptr if none.
+	 */
+	const DistributedRegion* continue_intersect(ActiveRay &ray) const;
+
+private:
 	/* Backtrack up the tree to find the next node we should test and update the stack,
 	 * returns false if the traversal is done.
 	 */
 	bool backtrack(ActiveRay &ray) const;
-
-private:
+	// Intersect the ray with the BVH using the existing traversal state on the ray
+	const DistributedRegion* intersect_with_state(ActiveRay &ray) const;
 	/* Construct a subtree of the BVH for the build_geom from [start, end)
 	 * and return the root of this subtree. The geometry is placed in the child
 	 * nodes is partitioned into ordered geom for easier look up later

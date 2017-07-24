@@ -10,6 +10,8 @@
 #include "data_parallel.h"
 #include "pup_operators.h"
 
+#define DEBUG_PIXEL -1
+
 // readonly global Charm++ variables
 extern CProxy_Main main_proxy;
 extern SceneMessage *scene;
@@ -63,7 +65,8 @@ void RenderingTile::report_shadow_ray(const uint64_t px, const glm::vec3 &result
 	// for the pixel plus (optionally) the primary ray branch factor and we accumulate
 	// until we get all the results back then normalize the color values.
 	for (size_t c = 0; c < 3; ++c) {
-		msg->tile[tx + c] += result[c];
+		//msg->tile[tx + c] += result[c];
+		msg->tile[tx + c] = result[c];
 	}
 	shadow_rays_received[px] += 1;
 }
@@ -220,6 +223,9 @@ void Region::send_ray(SendRayMessage *msg) {
 	 *   	1. Send the owner back black for the shading result.
 	 */
 	if (msg->ray.type == pt::RAY_TYPE::SHADOW) {
+		if (msg->ray.pixel == DEBUG_PIXEL) {
+			std::cout << " node " << thisIndex << " got ray to check " << msg->ray << "\n\n";
+		}
 		continue_shadow_ray(msg->ray, integrator->occluded(msg->ray));
 	} else {
 		continue_ray(msg->ray);
@@ -276,11 +282,7 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 
 			const pt::DistributedRegion *first_region = bvh.intersect(ray);
 			while (first_region && !first_region->is_mine) {
-				if (bvh.backtrack(ray)) {
-					first_region = bvh.intersect(ray);
-				} else {
-					first_region = nullptr;
-				}
+				first_region = bvh.continue_intersect(ray);
 			}
 			if (first_region) {
 				continue_ray(ray, &tile);
@@ -295,6 +297,10 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 }
 void Region::traverse_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
 	const pt::DistributedRegion *region = bvh.intersect(ray);
+	if (ray.type == pt::RAY_TYPE::SHADOW) {
+		throw std::runtime_error("SHADOW ray in traverse");
+	}
+
 	if (region && region->is_mine) {
 		continue_ray(ray, local_tile);
 	} else if (region) {
@@ -315,14 +321,16 @@ void Region::traverse_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
 	}
 }
 void Region::continue_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
+	if (ray.type == pt::RAY_TYPE::SHADOW) {
+		throw std::runtime_error("SHADOW ray in continue");
+	}
+
 	pt::IntersectionResult result = integrator->integrate(ray);
+	// Find and ship the ray off to the next region it needs to
+	// traverse, if there is no next region send the background color back
 	if (!result.shadow && !result.secondary) {
-		// Backtrack in the BVH and ship the ray off to the next region it needs to
-		// traverse, if there is no next region send the background color back
-		const pt::DistributedRegion *next = nullptr;
-		if (bvh.backtrack(ray)) {
-			next = bvh.intersect(ray);
-		}
+		const pt::DistributedRegion *next = bvh.continue_intersect(ray);
+
 		if (next) {
 			thisProxy[next->owner].send_ray(new SendRayMessage(ray));
 		} else {
@@ -371,10 +379,13 @@ void Region::continue_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
 	}
 }
 void Region::traverse_shadow_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
+	if (ray.type != pt::RAY_TYPE::SHADOW) {
+		throw std::runtime_error("non-SHADOW ray in traverse shadow");
+	}
+
 	const pt::DistributedRegion *shadow_region = bvh.intersect(ray);
-	bool occluded = false;
-	if (shadow_region && shadow_region->is_mine) {
-		occluded = integrator->occluded(ray);
+	if (ray.pixel == DEBUG_PIXEL) {
+		std::cout << "on " << thisIndex << " post-bvh intersect = " << ray << "\n\n";
 	}
 	if (!shadow_region) {
 		if (local_tile) {
@@ -385,10 +396,18 @@ void Region::traverse_shadow_ray(pt::ActiveRay &ray, RenderingTile *local_tile) 
 						ray.tile, ray.pixel, ray.type, 0, 0));
 		}
 	} else {
+		bool occluded = false;
+		if (shadow_region->is_mine) {
+			occluded = integrator->occluded(ray);
+		}
 		continue_shadow_ray(ray, occluded, local_tile);
 	}
 }
 void Region::continue_shadow_ray(pt::ActiveRay &ray, const bool occluded, RenderingTile *local_tile) {
+	if (ray.type != pt::RAY_TYPE::SHADOW) {
+		throw std::runtime_error("non-SHADOW ray in continue shadow");
+	}
+
 	// If we occluded it with local data, we're done. Otherwise there might be
 	// data on some other node which occludes and we need to ship the ray off.
 	// If there is no next region to traverse, the point is not occluded.
@@ -400,15 +419,20 @@ void Region::continue_shadow_ray(pt::ActiveRay &ray, const bool occluded, Render
 						glm::vec4(0), ray.tile, ray.pixel, ray.type, 0, 0));
 		}
 	} else {
-		// If our local data doesn't occlude the point, is there some other region that might?
-		const pt::DistributedRegion *next = nullptr;
-		if (bvh.backtrack(ray)) {
-			next = bvh.intersect(ray);
+		if (ray.pixel == DEBUG_PIXEL) {
+			std::cout << "on " << thisIndex << " ray checking for next region = " << ray << "\n\n";
 		}
+		// If our local data doesn't occlude the point, is there some other region that might?
+		const pt::DistributedRegion *next = bvh.continue_intersect(ray);
 
 		if (next) {
+			if (ray.pixel == DEBUG_PIXEL) {
+				std::cout << "on " << thisIndex << " ray shipping to " << next->owner << " = " << ray << "\n\n";
+			}
 			thisProxy[next->owner].send_ray(new SendRayMessage(ray));
 		} else {
+			//ray.color = glm::vec3(0);
+			//ray.color[thisIndex] = 1;
 			if (local_tile) {
 				local_tile->report_shadow_ray(ray.pixel, ray.color);
 			} else {

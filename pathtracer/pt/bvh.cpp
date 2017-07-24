@@ -56,18 +56,25 @@ BVH::BVH(const std::vector<const DistributedRegion*> &regions) : max_geom(1), ge
 BBox BVH::bounds() const {
 	return !flat_nodes.empty() ? flat_nodes[0].bounds : BBox{};
 }
-const DistributedRegion* BVH::intersect(ActiveRay &r) const {
+const DistributedRegion* BVH::intersect(ActiveRay &ray) const {
+	ray.traversal = BVHTraversalState();
+	return intersect_with_state(ray);
+}
+const DistributedRegion* BVH::continue_intersect(ActiveRay &ray) const {
+	// Perform the backtrack done after testing against a node's geometry
+	if (!backtrack(ray)) {
+		return nullptr;
+	}
+	return intersect_with_state(ray);
+}
+const DistributedRegion* BVH::intersect_with_state(ActiveRay &r) const {
 	const glm::vec3 inv_dir = glm::vec3(1.f) / r.ray.dir;
 	const std::array<int, 3> neg_dir = {inv_dir.x < 0, inv_dir.y < 0, inv_dir.z < 0};
 	BVHTraversalState &state = r.traversal;
 	while (true) {
 		const FlatNode &fnode = flat_nodes[state.current];
-		// If it's a leaf node we need to send the ray to the owner of the region
-		if (fnode.ngeom > 0) {
-			if (fnode.bounds.fast_intersect(r.ray, inv_dir, neg_dir)) {
-				return geometry[fnode.geom_offset];
-			}
-		} else {
+		// If it's an inner node test the ray against the children
+		if (fnode.ngeom == 0) {
 			// Check which (if any) children we hit
 			const std::array<bool, 2> child_hits{
 				flat_nodes[state.current + 1].bounds.fast_intersect(r.ray, inv_dir, neg_dir),
@@ -89,6 +96,12 @@ const DistributedRegion* BVH::intersect(ActiveRay &r) const {
 					state.current = fnode.second_child;
 				}
 				continue;
+			}
+		} else {
+			// If it's a leaf node we need to send the ray to the owner of the region
+			// The caller is then responsible for backtracking the ray
+			if (fnode.bounds.fast_intersect(r.ray, inv_dir, neg_dir)) {
+				return geometry[fnode.geom_offset];
 			}
 		}
 		if (!backtrack(r)) {
