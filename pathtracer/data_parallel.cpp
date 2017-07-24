@@ -19,7 +19,7 @@ extern uint64_t TILE_W;
 extern uint64_t TILE_H;
 extern uint64_t NUM_REGIONS;
 
-static const glm::vec3 POINT_LIGHT_POS(1.5, 1.5, 1);
+static const glm::vec3 POINT_LIGHT_POS(1.5, 1.5, 0.5);
 
 RenderingTile::RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const int64_t num_other_tiles,
 		const uint64_t charm_index)
@@ -57,7 +57,7 @@ void RenderingTile::report_secondary_ray(const uint64_t px, const uint64_t spawn
 	secondary_rays_expected[px] += spawned_secondary_rays;
 	shadow_rays_expected[px] += spawned_shadow_rays;
 }
-void RenderingTile::report_shadow_ray(const uint64_t px, const glm::vec4 &result) {
+void RenderingTile::report_shadow_ray(const uint64_t px, const glm::vec3 &result) {
 	const size_t tx = px * 4;
 	// TODO: This should turn into an accumulation where we know how many rays we sent
 	// for the pixel plus (optionally) the primary ray branch factor and we accumulate
@@ -241,7 +241,7 @@ void Region::report_ray(RayResultMessage *msg) {
 					msg->secondary_children);
 			break;
 		case pt::RAY_TYPE::SHADOW:
-			rt->second.report_shadow_ray(msg->pixel, msg->result);
+			rt->second.report_shadow_ray(msg->pixel, glm::vec3(msg->result));
 			break;
 		default:
 			std::cout << "Unhandled ray type in report_ray!\n";
@@ -328,10 +328,10 @@ void Region::continue_ray(pt::ActiveRay &ray, RenderingTile *local_tile) {
 		} else {
 			glm::vec4 primary_color(integrator->background, std::numeric_limits<float>::infinity());
 			// If there was an earlier hit along this ray, don't trample the results
-			if (!std::isinf(ray.color.w)) {
-				primary_color = ray.color;
+			if (!std::isinf(ray.ray.t_max)) {
+				primary_color = glm::vec4(ray.color, ray.ray.t_max);
 			} else if (result.any_hit) {
-				primary_color = glm::vec4(glm::vec3(0), ray.color.w);
+				primary_color = glm::vec4(glm::vec3(0), ray.ray.t_max);
 			}
 			if (local_tile) {
 				if (ray.type == pt::RAY_TYPE::PRIMARY) {
@@ -380,7 +380,8 @@ void Region::traverse_shadow_ray(pt::ActiveRay &ray, RenderingTile *local_tile) 
 		if (local_tile) {
 			local_tile->report_shadow_ray(ray.pixel, ray.color);
 		} else {
-			thisProxy[ray.owner_id].report_ray(new RayResultMessage(ray.color,
+			thisProxy[ray.owner_id].report_ray(new RayResultMessage(
+						glm::vec4(ray.color, ray.ray.t_max),
 						ray.tile, ray.pixel, ray.type, 0, 0));
 		}
 	} else {
@@ -392,12 +393,11 @@ void Region::continue_shadow_ray(pt::ActiveRay &ray, const bool occluded, Render
 	// data on some other node which occludes and we need to ship the ray off.
 	// If there is no next region to traverse, the point is not occluded.
 	if (occluded) {
-		const glm::vec4 shadow_result = glm::vec4(glm::vec3(0), ray.color.w);
 		if (local_tile) {
-			local_tile->report_shadow_ray(ray.pixel, shadow_result);
+			local_tile->report_shadow_ray(ray.pixel, glm::vec3(0));
 		} else {
 			thisProxy[ray.owner_id].report_ray(new RayResultMessage(
-						shadow_result, ray.tile, ray.pixel, ray.type, 0, 0));
+						glm::vec4(0), ray.tile, ray.pixel, ray.type, 0, 0));
 		}
 	} else {
 		// If our local data doesn't occlude the point, is there some other region that might?
@@ -412,7 +412,8 @@ void Region::continue_shadow_ray(pt::ActiveRay &ray, const bool occluded, Render
 			if (local_tile) {
 				local_tile->report_shadow_ray(ray.pixel, ray.color);
 			} else {
-				thisProxy[ray.owner_id].report_ray(new RayResultMessage(ray.color,
+				thisProxy[ray.owner_id].report_ray(new RayResultMessage(
+							glm::vec4(ray.color, ray.ray.t_max),
 							ray.tile, ray.pixel, ray.type, 0, 0));
 			}
 		}

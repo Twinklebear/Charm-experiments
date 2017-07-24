@@ -38,7 +38,7 @@ struct RenderingTile {
 			const uint64_t charm_index);
 	/* Report a primary ray, informing the tile how many shadow test results to
 	 * expect for the pixel to determine completion. If the ray has no children
-	 * the result will be written to the tile
+	 * the result will be written to the tile, result = {R, G, B, Z}
 	 */
 	void report_primary_ray(const uint64_t px, const uint64_t spawned_shadow_rays,
 			const uint64_t spawned_secondary_rays, const glm::vec4 &result);
@@ -47,8 +47,8 @@ struct RenderingTile {
 	 */
 	void report_secondary_ray(const uint64_t px, const uint64_t spawned_shadow_rays,
 			const uint64_t spawned_secondary_rays);
-	// Report a shading result for some pixel in this tile, result = {R, G, B, Z}
-	void report_shadow_ray(const uint64_t px, const glm::vec4 &result);
+	// Report a shading result for some pixel in this tile
+	void report_shadow_ray(const uint64_t px, const glm::vec3 &result);
 	bool complete() const;
 };
 

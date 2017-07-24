@@ -34,7 +34,7 @@ struct ActiveRay {
 	RAY_TYPE type;
 	Ray ray;
 	BVHTraversalState traversal;
-	glm::vec4 color;
+	glm::vec3 color;
 	uint64_t owner_id, tile, pixel;
 	// The number of shadow rays spawned from this ray
 	uint64_t children;

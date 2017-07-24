@@ -9,23 +9,17 @@ BVHTraversalState::BVHTraversalState() : current(0), bitstack(0) {}
 
 ActiveRay::ActiveRay(const Ray &r, const uint64_t owner_id, const uint64_t tile,
 		const uint64_t pixel)
-	: type(PRIMARY), ray(r), color(glm::vec3(0), r.t_max), owner_id(owner_id),
+	: type(PRIMARY), ray(r), color(0), owner_id(owner_id),
 	tile(tile), pixel(pixel), children(0)
 {}
 ActiveRay* ActiveRay::shadow(const Ray &r, const ActiveRay &parent) {
 	ActiveRay *ar = new ActiveRay(r, parent.owner_id, parent.tile, parent.pixel);
-	ar->children = 0;
 	ar->type = SHADOW;
-	ar->color.w = parent.ray.t_max;
-	ar->ray = r;
 	return ar;
 }
 ActiveRay* ActiveRay::secondary(const Ray &r, const ActiveRay &parent) {
 	ActiveRay *ar = new ActiveRay(r, parent.owner_id, parent.tile, parent.pixel);
-	ar->children = 0;
 	ar->type = SECONDARY;
-	ar->color.w = parent.ray.t_max;
-	ar->ray = r;
 	return ar;
 }
 
