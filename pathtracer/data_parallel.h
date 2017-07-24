@@ -8,8 +8,10 @@
 #include "pt/pt.h"
 
 class BoundsMessage;
-class SendRayMessage;
+class IntersectRayMessage;
+class ShadeRayMessage;
 class RayResultMessage;
+class TileCompleteMessage;
 
 /* A tile we own which is being actively rendered. We could
  * be the only region projecting to the tile and our objects
@@ -87,9 +89,14 @@ public:
 	void send_bounds(BoundsMessage *msg);
 	// Render the region tiles which this region projects to,
 	// compute and send primary rays for any pixels where this Region is the closest box
+	// TODO: Description of the ray sending and data stuff.
 	void render();
 	// Send a ray for traversal through this region's data.
-	void send_ray(SendRayMessage *msg);
+	void intersect_ray(IntersectRayMessage *msg);
+	/* Send a ray for shading by this region's data. This region should
+	 * be the one who owns the object being shaded
+	 */
+	void shade_ray(ShadeRayMessage *msg);
 	// Report the result of rendering a ray spawned from one of this regions primary rays
 	void report_ray(RayResultMessage *msg);
 
@@ -101,20 +108,21 @@ private:
 	 * spawning shadow and secondary rays, or simply continuing it on to
 	 * another node
 	 */
-	void traverse_ray(pt::ActiveRay &ray, RenderingTile *local_tile = nullptr);
+	void start_ray(pt::ActiveRay &ray);
 	/* Continue a primary/secondary ray through this node's data, potentially
 	 * spawning shadow and secondary rays, or simply continuing it on to
 	 * another node
 	 */
-	void continue_ray(pt::ActiveRay &ray, RenderingTile *local_tile = nullptr);
-	/* Traverse a newly spawned shadow ray through this node's data, potentially
-	 * shading the ray, or continuing it on
+	void intersect_ray(pt::ActiveRay &ray);
+	/* Shade a ray's hit point that hit a local object on this Chare. Will
+	 * compute the shaded color, potentially spawning shadow or secondary rays
+	 * as needed.
 	 */
-	void traverse_shadow_ray(pt::ActiveRay &ray, RenderingTile *local_tile = nullptr);
-	/* Continue a shadow ray through this node's data, potentially
-	 * shading the ray, or continuing it on
-	 */
-	void continue_shadow_ray(pt::ActiveRay &ray, RenderingTile *local_tile = nullptr);
+	void shade_ray(pt::ActiveRay &ray);
+	// Report that this ray has hit an object, according to its ray type
+	void report_hit(pt::ActiveRay &ray);
+	// Report this ray has not hit anything, according to its ray type
+	void report_miss(pt::ActiveRay &ray);
 	// Check if this region has data which projects to the tile
 	bool touches_tile(const uint64_t start_x, const uint64_t start_y, const pt::BBox &box) const;
 	// Project the passed bounding box to the screen
@@ -155,8 +163,11 @@ public:
 	static TileCompleteMessage* unpack(void *buf);
 };
 
-class SendRayMessage : public CMessage_SendRayMessage {
-	SendRayMessage();
+/* Message sent to a region that it should intersect the ray
+ * with its local data, and continue it if needed
+ */
+class IntersectRayMessage : public CMessage_IntersectRayMessage {
+	IntersectRayMessage();
 
 public:
 	// TODO: Packets or larger chunks of rays, compression.
@@ -164,12 +175,26 @@ public:
 	// SoA ray groups which we compress w/ ZFP.
 	pt::ActiveRay ray;
 
-	SendRayMessage(const pt::ActiveRay &ray);
+	IntersectRayMessage(const pt::ActiveRay &ray);
+	void msg_pup(PUP::er &p);
+};
+
+/* Message sent to a node that it's the one responsible for shading
+ * this ray. The message will be sent to the hit_info.hit_owner Chare
+ */
+class ShadeRayMessage : public CMessage_ShadeRayMessage {
+	ShadeRayMessage();
+
+public:
+	pt::ActiveRay ray;
+
+	ShadeRayMessage(const pt::ActiveRay &ray);
 	void msg_pup(PUP::er &p);
 };
 
 class RayResultMessage : public CMessage_RayResultMessage {
 	RayResultMessage();
+	static uint64_t DEBUG_COUNTER;
 
 public:
 	// RGBAZ of the rendering result. If Z = INF then there was no hit
@@ -180,6 +205,7 @@ public:
 	// If this ray is a primary ray or "path", this is the # of shadow
 	// rays spawned along this path we should expect to get results from
 	uint64_t shadow_children, secondary_children;
+	uint64_t debug_id;
 
 	RayResultMessage(const glm::vec4 &result, uint64_t tile, uint64_t pixel,
 			pt::RAY_TYPE type, uint64_t shadow_children, uint64_t secondary_children);

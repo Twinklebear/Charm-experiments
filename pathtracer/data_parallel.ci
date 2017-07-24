@@ -3,8 +3,11 @@ module data_parallel {
 	message BoundsMessage;
 	// Message sent to master when a distributed tile is completed
 	message TileCompleteMessage;
-	// Message sent to a region that it should render some ray
-	message SendRayMessage;
+	// Message sent to a region that it should intersect the ray
+	// with its local data, and continue it if needed
+	message IntersectRayMessage;
+	// Message sent to a region that it is responsible for shading the ray
+	message ShadeRayMessage;
 	// Message sent to the primary ray owner when a ray is completed
 	message RayResultMessage;
 
@@ -21,7 +24,10 @@ module data_parallel {
 		// compute and send primary rays for any pixels where this Region is the closest box
 		entry void render();
 		// Send a ray for traversal through this region's data.
-		entry void send_ray(SendRayMessage *msg);
+		entry void intersect_ray(IntersectRayMessage *msg);
+		// Send a ray for shading by this region's data. This region should
+		// be the one who owns the object being shaded
+		entry void shade_ray(ShadeRayMessage *msg);
 		// Report results from a ray owned by this region
 		entry void report_ray(RayResultMessage *msg);
 	};
