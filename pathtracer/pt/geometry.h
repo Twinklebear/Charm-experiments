@@ -15,7 +15,8 @@ protected:
 public:
 	Geometry(std::shared_ptr<BxDF> &brdf);
 	virtual ~Geometry();
-	virtual bool intersect(Ray &ray, DifferentialGeometry &dg) const = 0;
+	virtual bool intersect(Ray &ray) const = 0;
+	virtual void get_shading_info(const Ray &ray, DifferentialGeometry &dg) const = 0;
 	virtual BBox bounds() const = 0;
 };
 

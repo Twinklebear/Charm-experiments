@@ -6,7 +6,7 @@ Plane::Plane(const glm::vec3 &center, const glm::vec3 &normal, float half_length
 		std::shared_ptr<BxDF> &brdf)
 	: Geometry(brdf), center(center), normal(glm::normalize(normal)), half_length(half_length)
 {}
-bool Plane::intersect(Ray &ray, DifferentialGeometry &dg) const {
+bool Plane::intersect(Ray &ray) const {
 	const float d = -glm::dot(center, normal);
 	const float v = glm::dot(ray.dir, normal);
 	if (std::abs(v) < 1e-6f){
@@ -23,17 +23,18 @@ bool Plane::intersect(Ray &ray, DifferentialGeometry &dg) const {
 			&& std::abs(glm::dot(pt - center, bitan)) <= half_length)
 		{
 			ray.t_max = t;
-			dg.point = pt;
-			dg.normal = normal;
-			dg.brdf = brdf.get();
-			dg.tangent = tan;
-			dg.bitangent = bitan;
 			return true;
 		} else {
 			return false;
 		}
 	}
 	return false;
+}
+void Plane::get_shading_info(const Ray &ray, DifferentialGeometry &dg) const {
+	dg.point = ray.origin + ray.dir * ray.t_max;
+	dg.normal = normal;
+	dg.brdf = brdf.get();
+	coordinate_system(normal, dg.tangent, dg.bitangent);
 }
 BBox Plane::bounds() const {
 	glm::vec3 tan, bitan;
