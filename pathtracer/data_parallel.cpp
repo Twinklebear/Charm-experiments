@@ -19,7 +19,7 @@ extern uint64_t TILE_W;
 extern uint64_t TILE_H;
 extern uint64_t NUM_REGIONS;
 
-static const glm::vec3 POINT_LIGHT_POS(0, 1.5, 0);
+static const glm::vec3 POINT_LIGHT_POS(0, 1.5, 0.7);
 
 RenderingTile::RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const int64_t num_other_tiles,
 		const uint64_t charm_index)
@@ -63,8 +63,7 @@ void RenderingTile::report_shadow_ray(const uint64_t px, const glm::vec3 &result
 	// for the pixel plus (optionally) the primary ray branch factor and we accumulate
 	// until we get all the results back then normalize the color values.
 	for (size_t c = 0; c < 3; ++c) {
-		//msg->tile[tx + c] += result[c];
-		msg->tile[tx + c] = result[c];
+		msg->tile[tx + c] += result[c];
 	}
 	shadow_rays_received[px] += 1;
 }
@@ -85,11 +84,11 @@ Region::Region() : rng(std::random_device()()), bounds_received(0) {
 				lambertian_green);
 	} else if (thisIndex == 1) {
 		std::shared_ptr<pt::BxDF> red_mat = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
-		//std::shared_ptr<pt::BxDF> red_mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.8, 0.1, 0.1));
+	//	std::shared_ptr<pt::BxDF> red_mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.8, 0.1, 0.1));
 		my_object = std::make_shared<pt::Sphere>(glm::vec3(0, 0.4, 0), 0.5, red_mat);
 	} else {
 		std::shared_ptr<pt::BxDF> lambertian_blue = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
-		my_object = std::make_shared<pt::Sphere>(glm::vec3(1.5, 0.5, 0), 0.2, lambertian_blue);
+		my_object = std::make_shared<pt::Sphere>(glm::vec3(0.4, 0.5, 0.5), 0.2, lambertian_blue);
 	}
 	other_bounds.resize(NUM_REGIONS);
 	world.resize(NUM_REGIONS);
