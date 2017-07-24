@@ -112,7 +112,7 @@ private:
 	/* Continue a shadow ray through this node's data, potentially
 	 * shading the ray, or continuing it on
 	 */
-	void continue_shadow_ray(pt::ActiveRay &ray, const bool occluded, RenderingTile *local_tile = nullptr);
+	void continue_shadow_ray(pt::ActiveRay &ray, RenderingTile *local_tile = nullptr);
 	// Check if this region has data which projects to the tile
 	bool touches_tile(const uint64_t start_x, const uint64_t start_y, const pt::BBox &box) const;
 	// Project the passed bounding box to the screen
