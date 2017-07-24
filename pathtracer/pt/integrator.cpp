@@ -8,17 +8,19 @@ namespace pt {
 BVHTraversalState::BVHTraversalState() : current(0), bitstack(0) {}
 
 ActiveRay::ActiveRay(const Ray &r, const uint64_t owner_id, const uint64_t tile,
-		const uint64_t pixel)
-	: type(PRIMARY), ray(r), color(0), owner_id(owner_id),
+		const uint64_t pixel, const glm::vec3 &throughput)
+	: type(PRIMARY), ray(r), color(0), throughput(throughput), owner_id(owner_id),
 	tile(tile), pixel(pixel), children(0)
 {}
 ActiveRay* ActiveRay::shadow(const Ray &r, const ActiveRay &parent) {
-	ActiveRay *ar = new ActiveRay(r, parent.owner_id, parent.tile, parent.pixel);
+	ActiveRay *ar = new ActiveRay(r, parent.owner_id, parent.tile, parent.pixel,
+			parent.throughput);
 	ar->type = SHADOW;
 	return ar;
 }
 ActiveRay* ActiveRay::secondary(const Ray &r, const ActiveRay &parent) {
-	ActiveRay *ar = new ActiveRay(r, parent.owner_id, parent.tile, parent.pixel);
+	ActiveRay *ar = new ActiveRay(r, parent.owner_id, parent.tile, parent.pixel,
+			parent.throughput);
 	ar->type = SECONDARY;
 	return ar;
 }

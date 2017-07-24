@@ -27,22 +27,20 @@ IntersectionResult WhittedIntegrator::integrate(ActiveRay &ray) const {
 					* std::max(glm::dot(light_sample.dir, dg.normal), 0.f);
 				if (color != glm::vec3(0.f)) {
 					result.shadow = std::unique_ptr<ActiveRay>(ActiveRay::shadow(light_sample.occlusion_ray, ray));
-					for (size_t i = 0; i < 3; ++ i) {
-						result.shadow->color[i] = color[i];
-					}
+					result.shadow->color = color * ray.throughput;
+				} else {
+					ray.throughput = glm::vec3(0);
 				}
 			}
 		} else if (ray.ray.depth < 6) {
-			// TODO: We actually need to create and ship off an ActiveRay as a secondary ray.
 			if (dg.brdf->bxdf_type() & BRDFType::Reflection) {
 				const BxDFSample f = dg.brdf->sample(w_o, dummy_samples);
 				if (f.pdf != 0.f && f.color != glm::vec3(0.f)) {
 					Ray refl_ray(dg.point, dg.from_shading(f.w_i), 0.001);
 					refl_ray.depth = ray.ray.depth + 1;
 					result.secondary = std::unique_ptr<ActiveRay>(ActiveRay::secondary(refl_ray, ray));
-					for (size_t i = 0; i < 3; ++ i) {
-						result.secondary->color[i] = f.color[i];
-					}
+					result.secondary->color = f.color;
+					result.secondary->throughput = f.color * ray.throughput;
 				}
 			}
 			if (dg.brdf->bxdf_type() & BRDFType::Transmission) {

@@ -34,13 +34,13 @@ struct ActiveRay {
 	RAY_TYPE type;
 	Ray ray;
 	BVHTraversalState traversal;
-	glm::vec3 color;
+	glm::vec3 color, throughput;
 	uint64_t owner_id, tile, pixel;
 	// The number of shadow rays spawned from this ray
 	uint64_t children;
 
 	ActiveRay(const Ray &r, const uint64_t owner_id, const uint64_t tile,
-			const uint64_t pixel);
+			const uint64_t pixel, const glm::vec3 &throughput);
 	// TODO: Maybe just return a unique_ptr?
 	static ActiveRay* shadow(const Ray &r, const ActiveRay &parent);
 	static ActiveRay* secondary(const Ray &r, const ActiveRay &parent);
