@@ -19,8 +19,6 @@ extern uint64_t TILE_W;
 extern uint64_t TILE_H;
 extern uint64_t NUM_REGIONS;
 
-static const glm::vec3 POINT_LIGHT_POS(0, 1.5, 0.7);
-
 RenderingTile::RenderingTile(const uint64_t tile_x, const uint64_t tile_y, const int64_t num_other_tiles,
 		const uint64_t charm_index)
 	: msg(new TileCompleteMessage(tile_x, tile_y, num_other_tiles)),
@@ -86,18 +84,32 @@ bool RenderingTile::complete() const {
 
 Region::Region() : rng(std::random_device()()), bounds_received(0) {
 	if (thisIndex == 0) {
-		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.8, 0.1));
-		my_object = std::make_shared<pt::Plane>(glm::vec3(0), glm::vec3(0, 1, 0), 4, mat);
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(1));
+		my_object = std::make_shared<pt::Plane>(glm::vec3(0), glm::vec3(0, 1, 0), 5, mat);
 	} else if (thisIndex == 1) {
-		//std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
-		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.8, 0.1, 0.1));
-		my_object = std::make_shared<pt::Sphere>(glm::vec3(0, 0.4, 0), 0.7, mat);
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.9));
+		my_object = std::make_shared<pt::Sphere>(glm::vec3(0.5, 0.5, 0), 1, mat);
 	} else if (thisIndex == 2) {
 		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
-		my_object = std::make_shared<pt::Sphere>(glm::vec3(1, 0.5, 0.5), 0.2, mat);
+		my_object = std::make_shared<pt::Sphere>(glm::vec3(2, 1.2, 0.5), 0.5, mat);
 	} else if (thisIndex == 3) {
 		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(1));
-		my_object = std::make_shared<pt::Plane>(glm::vec3(0, 0, -4), glm::vec3(0, 0, 1), 4, mat);
+		my_object = std::make_shared<pt::Plane>(glm::vec3(0, 0, -3), glm::vec3(0, 0, 1), 5, mat);
+	} else if (thisIndex == 4) {
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.25, 0.75, 0.25));
+		my_object = std::make_shared<pt::Plane>(glm::vec3(3, 0, 0), glm::vec3(-1, 0, 0), 5, mat);
+	} else if (thisIndex == 5) {
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.75, 0.25, 0.25));
+		my_object = std::make_shared<pt::Plane>(glm::vec3(-3, 0, 0), glm::vec3(1, 0, 0), 5, mat);
+	} else if (thisIndex == 6) {
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(1));
+		my_object = std::make_shared<pt::Plane>(glm::vec3(0, 4, 0), glm::vec3(0, -1, 0), 4.5, mat);
+	} else if (thisIndex == 7) {
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.9));
+		my_object = std::make_shared<pt::Sphere>(glm::vec3(-1.5, 1, -0.2), 0.7, mat);
+	} else if (thisIndex == 8) {
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.75, 0.25, 0.45));
+		my_object = std::make_shared<pt::Sphere>(glm::vec3(-1, 0, 1), 0.5, mat);
 	} else {
 		throw std::runtime_error("too many test regions!");
 	}
@@ -145,7 +157,7 @@ void Region::send_bounds(BoundsMessage *msg) {
 		integrator = std::unique_ptr<pt::WhittedIntegrator>(new pt::WhittedIntegrator(glm::vec3(0.05),
 			pt::Scene({my_object},
 			{
-				std::make_shared<pt::PointLight>(POINT_LIGHT_POS, glm::vec3(2)),
+				std::make_shared<pt::PointLight>(glm::vec3(-0.5, 2, 1), glm::vec3(8)),
 			},
 			&bvh
 		)));
