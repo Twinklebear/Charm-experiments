@@ -1,6 +1,6 @@
 GLM_DIR?=/usr/include/
 CXXFLAGS=-Wall -Wextra -pedantic -std=c++14 \
-		 -DGLM_FORCE_RADIANS -I$(GLM_DIR) -O2 -g
+		 -DGLM_FORCE_RADIANS -I$(GLM_DIR) -g
 
 SRCS=ray.cpp camera.cpp sphere.cpp stb_image.cpp hit_integrator.cpp \
 	 normal_integrator.cpp whitted_integrator.cpp scene.cpp \

@@ -2,7 +2,7 @@ CHARMDIR?=~/libs/charm/multicore-linux64
 GLM_DIR?=/usr/include/
 CHARMCFLAGS=-module CommonLBs -balance workstealing -language charm++ \
 			-c++-option -std=c++14 -c++-option -DGLM_FORCE_RADIANS \
-			-c++-option -I$(GLM_DIR) -c++-option -O2 -c++-option -g -optimize
+			-c++-option -I$(GLM_DIR) -c++-option -g
 CHARMC=$(CHARMDIR)/bin/charmc -cc $(CC) -c++ $(CXX) $(OPTS)
 
 CHARM_SRCS=main.cpp image_parallel_tile.cpp data_parallel.cpp
