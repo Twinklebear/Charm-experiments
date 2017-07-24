@@ -28,5 +28,27 @@ inline void operator|(PUP::er &p, pt::Ray &ray) {
 	p | ray.t_max;
 	p | ray.depth;
 }
+inline void operator|(PUP::er &p, pt::HitInfo &hit) {
+	p | hit.hit;
+	p | hit.hit_owner;
+	p | hit.hit_object;
+}
+inline void operator|(PUP::er &p, pt::ActiveRay &ray) {
+	int ray_type = ray.type;
+	p | ray_type;
+	ray.type = static_cast<pt::RAY_TYPE>(ray_type);
+	p | ray.ray;
 
+	p | ray.traversal.current;
+	p | ray.traversal.bitstack;
+
+	p | ray.hit_info;
+
+	p | ray.color;
+	p | ray.throughput;
+	p | ray.owner_id;
+	p | ray.tile;
+	p | ray.pixel;
+	p | ray.children;
+}
 
