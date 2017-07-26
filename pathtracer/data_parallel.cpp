@@ -86,7 +86,7 @@ Region::Region() : rng(std::random_device()()), bounds_received(0) {
 		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(1));
 		my_object = std::make_shared<pt::Plane>(glm::vec3(0), glm::vec3(0, 1, 0), 5, mat);
 	} else if (thisIndex == 1) {
-		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.9));
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.9, 0.3, 0.9));
 		my_object = std::make_shared<pt::Sphere>(glm::vec3(0.5, 0.5, 0), 1, mat);
 	} else if (thisIndex == 2) {
 		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
@@ -104,7 +104,7 @@ Region::Region() : rng(std::random_device()()), bounds_received(0) {
 		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(1));
 		my_object = std::make_shared<pt::Plane>(glm::vec3(0, 4, 0), glm::vec3(0, -1, 0), 4.5, mat);
 	} else if (thisIndex == 7) {
-		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.9));
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.3, 0.9, 0.9));
 		my_object = std::make_shared<pt::Sphere>(glm::vec3(-1.5, 1, -0.2), 0.7, mat);
 	} else if (thisIndex == 8) {
 		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.75, 0.25, 0.45));
