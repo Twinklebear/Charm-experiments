@@ -131,21 +131,11 @@ void Main::tile_done(const uint64_t x, const uint64_t y, const float *tile) {
 		using namespace std::chrono;
 		auto end = high_resolution_clock::now();
 		auto duration = duration_cast<milliseconds>(end - start_pass);
-		CkPrintf("Iteration took %dms\n", duration.count());
+		CkPrintf("Iteration %d/%d took %dms\n", samples_taken, spp, duration.count());
 		if (samples_taken == spp) {
 			duration = duration_cast<milliseconds>(end - start_render);
 			CkPrintf("Rendering took %dms\n", duration.count());
-
-			std::vector<uint8_t> image_out(IMAGE_W * IMAGE_H * 3, 0);
-			for (uint64_t i = 0; i < IMAGE_H; ++i) {
-				for (uint64_t j = 0; j < IMAGE_W; ++j) {
-					for (uint32_t c = 0; c < 3; ++c) {
-						const float x = linear_to_srgb(image[(i * IMAGE_W + j) * 3 + c] / spp) * 255.0;
-						image_out[(i * IMAGE_W + j) * 3 + c] = glm::clamp(x, 0.f, 255.f);
-					}
-				}
-			}
-			stbi_write_png("pathtracer_render.png", IMAGE_W, IMAGE_H, 3, image_out.data(), IMAGE_W * 3);
+			save_image("pathtracer_render.png");
 			CkExit();
 		} else {
 			start_pass = high_resolution_clock::now();
@@ -169,7 +159,6 @@ void Main::tile_done(TileCompleteMessage *msg) {
 		if (tile.region_tiles.size() == tile.num_tiles) {
 			++done_count;
 			if (done_count == num_tiles) {
-				CkPrintf("Done with distributed rendering of image\n");
 				composite_image();
 			}
 		}
@@ -187,16 +176,13 @@ void Main::composite_image() {
 	using namespace std::chrono;
 	auto end = high_resolution_clock::now();
 	auto duration = duration_cast<milliseconds>(end - start_pass);
-	CkPrintf("Iteration took %dms\n", duration.count());
-	duration = duration_cast<milliseconds>(end - start_render);
-	CkPrintf("Rendering took %dms\n", duration.count());
 
 	// Go through each tile and composite the regions results.
 	// Note that we don't need to do alpha blending here, since we're
 	// sending rays if a previous node is transparent it would have continue
 	// the ray on to the next node behind it, so we can safely pick the first
 	// hit color for each pixel.
-	for (const auto &t : region_tiles) {
+	for (auto &t : region_tiles) {
 		// No regions rendered for this tile
 		if (t.region_tiles.empty()) {
 			continue;
@@ -219,13 +205,28 @@ void Main::composite_image() {
 
 				const size_t ix = ((i + tile_px_y) * IMAGE_W + j + tile_px_x) * 3;
 				for (size_t c = 0; c < 3; ++c) {
-					image[ix + c] = t.region_tiles[first_hit][tx + c];
+					image[ix + c] += t.region_tiles[first_hit][tx + c];
 				}
 			}
 		}
+		t.region_tiles.clear();
 	}
 
-	// Now convert to sRGB and save the image out
+	done_count = 0;
+	++samples_taken;
+	CkPrintf("Iteration %d/%d took %dms\n", samples_taken, spp, duration.count());
+
+	if (samples_taken == spp) {
+		duration = duration_cast<milliseconds>(end - start_render);
+		CkPrintf("Rendering took %dms\n", duration.count());
+		save_image("pathtracer_render.png");
+		CkExit();
+	} else {
+		start_pass = high_resolution_clock::now();
+		regions.render();
+	}
+}
+void Main::save_image(const std::string &fname) {
 	std::vector<uint8_t> image_out(IMAGE_W * IMAGE_H * 3, 0);
 	for (uint64_t i = 0; i < IMAGE_H; ++i) {
 		for (uint64_t j = 0; j < IMAGE_W; ++j) {
@@ -236,9 +237,8 @@ void Main::composite_image() {
 			}
 		}
 	}
-	stbi_write_png("pathtracer_render.png", IMAGE_W, IMAGE_H, 3, image_out.data(), IMAGE_W * 3);
-	CkPrintf("Image saved to 'pathtracer_render.png'\n");
-	CkExit();
+	stbi_write_png(fname.c_str(), IMAGE_W, IMAGE_H, 3, image_out.data(), IMAGE_W * 3);
+	CkPrintf("Image saved to '%s'\n", fname.c_str());
 }
 
 SceneMessage::SceneMessage(const glm::vec3 &cam_pos, const glm::vec3 &cam_target, const glm::vec3 &cam_up)

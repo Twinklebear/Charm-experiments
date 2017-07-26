@@ -46,6 +46,8 @@ private:
 	// Composite the region tiles from the distributed rendering
 	// to the final image
 	void composite_image();
+	// Convert the image to sRGB and save it out
+	void save_image(const std::string &fname);
 };
 
 class SceneMessage : public CMessage_SceneMessage {
