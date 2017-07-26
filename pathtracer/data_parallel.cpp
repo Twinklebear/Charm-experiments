@@ -156,7 +156,7 @@ void Region::send_bounds(BoundsMessage *msg) {
 		integrator = std::unique_ptr<pt::PathIntegrator>(new pt::PathIntegrator(glm::vec3(0.05),
 			pt::Scene({my_object},
 			{
-				std::make_shared<pt::PointLight>(glm::vec3(-0.5, 2, 1), glm::vec3(0.8)),
+				std::make_shared<pt::PointLight>(glm::vec3(-0.5, 2, 1), glm::vec3(2)),
 			},
 			&bvh
 		)));
