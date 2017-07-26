@@ -14,9 +14,9 @@ IntersectionResult WhittedIntegrator::integrate(ActiveRay &ray) const {
 	const float dummy_samples[2] = {0};
 	DifferentialGeometry dg;
 	scene.geometry[ray.hit_info.hit_object]->get_shading_info(ray.ray, dg);
+	dg.orthonormalize();
 
 	glm::vec3 lighting(0);
-	dg.orthonormalize();
 	const glm::vec3 w_o = dg.to_shading(-ray.ray.dir);
 	if (!(dg.brdf->bxdf_type() & BRDFType::Specular)) {
 		for (const auto &l : scene.lights) {
@@ -51,8 +51,7 @@ IntersectionResult WhittedIntegrator::integrate(ActiveRay &ray) const {
 // TODO: occluded will not be needed anymore since we'd just call the new scene
 // intersect method directly instead.
 bool WhittedIntegrator::occluded(ActiveRay &ray) const {
-	DifferentialGeometry dg;
-	return scene.intersect(ray.ray, dg);
+	return scene.intersect(ray);
 }
 
 }

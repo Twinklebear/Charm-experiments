@@ -49,7 +49,7 @@ void ImageParallelTile::render() {
 
 	// TODO: Each tile should be also have Z for compositing primary rays.
 	float *tile = new float[TILE_W * TILE_H * 3];
-	const pt::PathIntegrator integrator(glm::vec3(0.05), pt::Scene({
+	pt::PathIntegrator integrator(glm::vec3(0.05), pt::Scene({
 			std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, lambertian_blue),
 			std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.7, 1.0), 0.25, lambertian_blue),
 			std::make_shared<pt::Sphere>(glm::vec3(-1, -0.75, 1.2), 0.5, lambertian_red),
