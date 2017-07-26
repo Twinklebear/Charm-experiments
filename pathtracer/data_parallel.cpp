@@ -9,24 +9,6 @@
 #include "data_parallel.h"
 #include "pup_operators.h"
 
-#include <iomanip>
-
-#define DEBUG_PIXEL 99
-#define DEBUG_TILE 2
-
-template<typename F>
-inline void DEBUG_RAY(const pt::ActiveRay &r, F fcn) {
-	if (r.tile == DEBUG_TILE && r.pixel == DEBUG_PIXEL) {
-		fcn();
-	}
-}
-template<typename F>
-inline void DEBUG_RAY(const uint64_t tile, const uint64_t pixel, F fcn) {
-	if (tile == DEBUG_TILE && pixel == DEBUG_PIXEL) {
-		fcn();
-	}
-}
-
 // readonly global Charm++ variables
 extern CProxy_Main main_proxy;
 extern SceneMessage *scene;
@@ -50,10 +32,6 @@ void RenderingTile::report_primary_ray(const uint64_t px, const uint64_t spawned
 		const uint64_t spawned_secondary_rays, const glm::vec4 &result)
 {
 	if (primary_rays_expected[px] == 0) {
-		std::cout << "Unexpected primary ray! { " << px << ", "
-			<< msg->tile_id << ", "
-			<< spawned_shadow_rays << ", " << spawned_secondary_rays
-			<< ", " << glm::to_string(result) << "}" << std::endl;
 		throw std::runtime_error("Unexpected primary ray reported on tile! #"
 				+ std::to_string(msg->tile_id));
 	}
@@ -100,12 +78,6 @@ bool RenderingTile::complete() const {
 			secondary_rays_expected.begin());
 	const bool shadow_done = std::equal(shadow_rays_received.begin(), shadow_rays_received.end(),
 			shadow_rays_expected.begin());
-	/*
-	std::cout << "Tile[" << msg->tile_x << ", " << msg->tile_y << "] status: "
-		<< std::boolalpha
-		<< " primary? " << primary_done << ", shadow? " << shadow_done
-		<< ", secondary? " << secondary_done << "\n";
-		*/
 	return primary_done && shadow_done && secondary_done;
 }
 
@@ -114,8 +86,7 @@ Region::Region() : rng(std::random_device()()), bounds_received(0) {
 		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(1));
 		my_object = std::make_shared<pt::Plane>(glm::vec3(0), glm::vec3(0, 1, 0), 5, mat);
 	} else if (thisIndex == 1) {
-		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.9));
-		//std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.9));
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.9));
 		my_object = std::make_shared<pt::Sphere>(glm::vec3(0.5, 0.5, 0), 1, mat);
 	} else if (thisIndex == 2) {
 		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
@@ -241,20 +212,22 @@ void Region::render() {
 			// TODO: If I'm not first for any pixel on this tile, I shouldn't send the
 			// final tile at all.
 			if (touches_tile(start_x, start_y, screen_bounds)) {
-				//std::cout << "Chare " << thisIndex << " touches tile\n";
 				regions_in_tile.insert(thisIndex);
 				auto it = rendering_tiles.emplace(tid, RenderingTile(tx, ty, other_regions + 1, thisIndex));
 				render_tile(it.first->second, tx * TILE_W, ty * TILE_H, tid, regions_in_tile);
-				if (it.first->second.complete()) {
-					//std::cout << "Chare " << thisIndex << " finished tile\n";
+				if (it.first->second.msg && it.first->second.complete()) {
 					main_proxy.tile_done(it.first->second.msg);
+					it.first->second.msg = nullptr;
 				}
 			} else if (other_regions == 0 && tid % NUM_REGIONS == thisIndex) {
 				// It's our job to fill the tile with background color from the renderer,
 				// since no data projects to this tile.
 				auto it = rendering_tiles.emplace(tid, RenderingTile(tx, ty, 1, thisIndex));
 				render_tile(it.first->second, tx * TILE_W, ty * TILE_H, tid, regions_in_tile);
-				main_proxy.tile_done(it.first->second.msg);
+				if (it.first->second.msg && it.first->second.complete()) {
+					main_proxy.tile_done(it.first->second.msg);
+					it.first->second.msg = nullptr;
+				}
 			}
 		}
 	}
@@ -268,39 +241,8 @@ void Region::shade_ray(ShadeRayMessage *msg) {
 	delete msg;
 }
 void Region::report_ray(RayResultMessage *msg) {
-	DEBUG_RAY(msg->tile, msg->pixel, [&]() {
-			std::cout << "Chare " << thisIndex << " getting ray result report"
-				<< ", result = " << glm::to_string(msg->result)
-				<< ", shadows = " << msg->shadow_children
-				<< ", secondaries = " << msg->secondary_children
-				<< ", debug id = " << msg->debug_id
-				<< std::endl;
-	});
-	auto rt = rendering_tiles.find(msg->tile);
-	if (rt == rendering_tiles.end()) {
-		throw std::runtime_error("Invalid msg->tile id in RayResultMessage!");
-	}
-	switch (msg->type) {
-		case pt::RAY_TYPE::PRIMARY:
-			rt->second.report_primary_ray(msg->pixel, msg->shadow_children,
-					msg->secondary_children, msg->result);
-			break;
-		case pt::RAY_TYPE::SECONDARY:
-			rt->second.report_secondary_ray(msg->pixel, msg->shadow_children,
-					msg->secondary_children, msg->result);
-			break;
-		case pt::RAY_TYPE::SHADOW:
-			rt->second.report_shadow_ray(msg->pixel, glm::vec3(msg->result));
-			break;
-		default:
-			throw std::runtime_error("Unhandled ray type in report_ray!");
-	}
+	report_ray(msg->result);
 	delete msg;
-
-	if (rt->second.complete()) {
-		//std::cout << "Chare " << thisIndex << " finished tile\n";
-		main_proxy.tile_done(rt->second.msg);
-	}
 }
 void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint64_t start_y,
 		const uint64_t tile_id, const std::set<size_t> &regions_in_tile)
@@ -323,10 +265,6 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 			const pt::Ray cam_ray = camera.generate_ray(px, py,
 					{real_distrib(ray_dir_rng), real_distrib(ray_dir_rng)});
 			pt::ActiveRay ray(cam_ray, thisIndex, tile.msg->tile_id, pixel, glm::vec3(1));
-			/*
-			std::cout << "Chare " << thisIndex << " starting ray for [" << j
-				<< ", " << i << "] (" << pixel << ")\n";
-				*/
 			start_ray(ray);
 		}
 	}
@@ -335,85 +273,44 @@ void Region::start_ray(pt::ActiveRay &ray) {
 	const pt::DistributedRegion *region = bvh.intersect(ray);
 	if (region) {
 		if (region->is_mine) {
-			DEBUG_RAY(ray, [&]() {
-				std::cout << "Chare " << thisIndex << " intersecting primary "
-					<< "ray(" << ray.pixel << ")\n";
-			});
 			intersect_ray(ray);
 		} else if (ray.type != pt::RAY_TYPE::PRIMARY) {
-			DEBUG_RAY(ray, [&]() {
-				std::cout << "Chare " << thisIndex << " shipping primary "
-				<< "ray(" << ray.pixel << ")\n";
-			});
 			// Everyone tries to start the primary rays for pixels their data projects too
 			// so don't send primary rays here, the other node has already created it.
-			thisProxy[region->owner].intersect_ray(new IntersectRayMessage(ray));
+			dispatch(region->owner, new IntersectRayMessage(ray));
 		} else {
-			DEBUG_RAY(ray, [&]() {
-				std::cout << "Chare " << thisIndex << " self-reporting unowned primary "
-					<< "ray(" << ray.pixel << ")\n";
-			});
 			// We don't own these pixels but still need to mark them completed
 			// locally to finish the tile.
 			report_miss(ray);
 		}
 	} else {
-		DEBUG_RAY(ray, [&]() {
-			std::cout << "Chare " << thisIndex << " primary misses scene, "
-					<< "ray(" << ray.pixel << ")\n";
-		});
 		report_miss(ray);
 	}
 }
 void Region::intersect_ray(pt::ActiveRay &ray) {
 	const bool hit = integrator->scene.intersect(ray);
+	if (hit) {
+		ray.hit_info.hit_owner = thisIndex;
+	}
 	// It's occluded and we're done here
 	if (hit && ray.type == pt::RAY_TYPE::SHADOW) {
-		DEBUG_RAY(ray, [&]() {
-		std::cout << "Chare " << thisIndex << " reporting hit on '" << ray.type << "' "
-			<< "ray(" << ray.pixel << ")\n";
-		});
 		report_hit(ray);
 	} else {
 		const pt::DistributedRegion *next = bvh.continue_intersect(ray);
 		if (next) {
-			DEBUG_RAY(ray, [&]() {
-				std::cout << "Chare " << thisIndex << " continuing '" << ray.type << "' "
-					<< "ray(" << ray.pixel << ")\n";
-			});
-			thisProxy[next->owner].intersect_ray(new IntersectRayMessage(ray));
+			dispatch(next->owner, new IntersectRayMessage(ray));
 		} else if (ray.hit_info.hit) {
-			ray.hit_info.hit_owner = thisIndex;
-			DEBUG_RAY(ray, [&]() {
-				std::cout << "Chare " << thisIndex << " reporting hit on '" << ray.type << "' "
-					<< "ray(" << ray.pixel << ")\n";
-			});
 			report_hit(ray);
 		} else {
-			DEBUG_RAY(ray, [&]() {
-				std::cout << "Chare " << thisIndex << " reporting miss on '" << ray.type << "' "
-					<< "ray(" << ray.pixel << ")\n";
-			});
 			report_miss(ray);
 		}
 	}
 }
 void Region::shade_ray(pt::ActiveRay &ray) {
-	DEBUG_RAY(ray, [&]() {
-		std::cout << "Chare " << thisIndex << " handling shade ray on '" << ray.type << "' "
-			<< "ray(" << ray.pixel << ")\n";
-	});
-	ray.color = glm::vec3(0);
-	ray.color[thisIndex % 3] = ((thisIndex % 3) + 1) / 3.0;
-	thisProxy[ray.owner_id].report_ray(new RayResultMessage(
-				glm::vec4(ray.color, ray.ray.t_max),
-				ray.tile, ray.pixel, ray.type, 0, 0));
-
-	/*
 	pt::IntersectionResult result = integrator->integrate(ray);
 	// If there's no shadow or secondary ray we're shading a back face hit
 	if (!result.shadow && !result.secondary) {
-		thisProxy[ray.owner_id].report_ray(new RayResultMessage(
+		dispatch(ray.owner_id, new RayResultMessage(
 					glm::vec4(0, 0, 0, ray.ray.t_max),
 					ray.tile, ray.pixel, ray.type, 0, 0));
 	} else {
@@ -421,7 +318,7 @@ void Region::shade_ray(pt::ActiveRay &ray) {
 		const uint64_t shadow_child = result.shadow ? 1 : 0;
 		const uint64_t secondary_child = result.secondary ? 1 : 0;
 
-		thisProxy[ray.owner_id].report_ray(new RayResultMessage(
+		dispatch(ray.owner_id, new RayResultMessage(
 					glm::vec4(0, 0, 0, ray.ray.t_max),
 					ray.tile, ray.pixel, ray.type,
 					shadow_child, secondary_child));
@@ -433,54 +330,54 @@ void Region::shade_ray(pt::ActiveRay &ray) {
 	if (result.shadow) {
 		start_ray(*result.shadow);
 	}
-	*/
 }
 void Region::report_hit(pt::ActiveRay &ray) {
 	if (ray.type == pt::RAY_TYPE::SHADOW) {
-		thisProxy[ray.owner_id].report_ray(new RayResultMessage(
+		dispatch(ray.owner_id, new RayResultMessage(
 					glm::vec4(0, 0, 0, ray.ray.t_max), ray.tile,
 					ray.pixel, ray.type, 0, 0));
 	} else {
-		DEBUG_RAY(ray, [&]() {
-			std::cout << "Chare " << thisIndex << " sending shade ray msg '" << ray.type << "' "
-				<< "ray(" << ray.pixel << ") = " << ray << "\n";
-		});
-
-		/*
-		if (thisIndex == ray.hit_info.hit_owner) {
-		// Charm++ dies about some message corruption if we do this? Why/
-			shade_ray(ray);
-		} else {
-		*/
-			thisProxy[ray.hit_info.hit_owner].shade_ray(new ShadeRayMessage(ray));
-		//}
+		dispatch(ray.hit_info.hit_owner, new ShadeRayMessage(ray));
 	}
 }
 void Region::report_miss(pt::ActiveRay &ray) {
 	if (ray.type == pt::RAY_TYPE::PRIMARY) {
-		DEBUG_RAY(ray, [&]() {
-			std::cout << "Chare " << thisIndex << " sending report miss '" << ray.type << "' "
-				<< "ray(" << ray.pixel << ") = " << ray << "\n";
-		});
-		thisProxy[ray.owner_id].report_ray(new RayResultMessage(
+		dispatch(ray.owner_id, new RayResultMessage(
 					glm::vec4(integrator->background, ray.ray.t_max),
 					ray.tile, ray.pixel, ray.type, 0, 0));
 	} else if (ray.type == pt::RAY_TYPE::SECONDARY) {
-		DEBUG_RAY(ray, [&]() {
-			std::cout << "Chare " << thisIndex << " sending report miss '" << ray.type << "' "
-				<< "ray(" << ray.pixel << ") = " << ray << "\n";
-		});
-		thisProxy[ray.owner_id].report_ray(new RayResultMessage(
+		dispatch(ray.owner_id, new RayResultMessage(
 					glm::vec4(integrator->background * ray.throughput, ray.ray.t_max),
 					ray.tile, ray.pixel, ray.type, 0, 0));
 	} else if (ray.type == pt::RAY_TYPE::SHADOW) {
-		DEBUG_RAY(ray, [&]() {
-			std::cout << "Chare " << thisIndex << " sending report miss '" << ray.type << "' "
-				<< "ray(" << ray.pixel << ") = " << ray << "\n";
-		});
-		thisProxy[ray.owner_id].report_ray(new RayResultMessage(
+		dispatch(ray.owner_id, new RayResultMessage(
 					glm::vec4(ray.color, ray.ray.t_max),
 					ray.tile, ray.pixel, ray.type, 0, 0));
+	}
+}
+void Region::report_ray(const RayResult &result) {
+	auto rt = rendering_tiles.find(result.tile);
+	if (rt == rendering_tiles.end()) {
+		throw std::runtime_error("Invalid result.tile id in RayResult!");
+	}
+	switch (result.type) {
+		case pt::RAY_TYPE::PRIMARY:
+			rt->second.report_primary_ray(result.pixel, result.shadow_children,
+					result.secondary_children, result.result);
+			break;
+		case pt::RAY_TYPE::SECONDARY:
+			rt->second.report_secondary_ray(result.pixel, result.shadow_children,
+					result.secondary_children, result.result);
+			break;
+		case pt::RAY_TYPE::SHADOW:
+			rt->second.report_shadow_ray(result.pixel, glm::vec3(result.result));
+			break;
+		default:
+			throw std::runtime_error("Unhandled ray type in report_ray!");
+	}
+	if (rt->second.complete()) {
+		main_proxy.tile_done(rt->second.msg);
+		rt->second.msg = nullptr;
 	}
 }
 bool Region::touches_tile(const uint64_t start_x, const uint64_t start_y, const pt::BBox &bounds) const {
@@ -507,6 +404,30 @@ pt::BBox Region::project_bounds(const pt::BBox &b) const {
 	}
 	return screen_bounds;
 }
+void Region::dispatch(const uint64_t to, IntersectRayMessage *msg) {
+	if (thisIndex == to) {
+		intersect_ray(msg->ray);
+		delete msg;
+	} else {
+		thisProxy[to].intersect_ray(msg);
+	}
+}
+void Region::dispatch(const uint64_t to, ShadeRayMessage *msg) {
+	if (thisIndex == to) {
+		shade_ray(msg->ray);
+		delete msg;
+	} else {
+		thisProxy[to].shade_ray(msg);
+	}
+}
+void Region::dispatch(const uint64_t to, RayResultMessage *msg) {
+	if (thisIndex == to) {
+		report_ray(msg->result);
+		delete msg;
+	} else {
+		thisProxy[to].report_ray(msg);
+	}
+}
 
 BoundsMessage::BoundsMessage(const uint64_t id, const pt::BBox &bounds) : id(id), bounds(bounds) {}
 void BoundsMessage::msg_pup(PUP::er &p) {
@@ -514,7 +435,6 @@ void BoundsMessage::msg_pup(PUP::er &p) {
 	p | bounds;
 }
 
-TileCompleteMessage::TileCompleteMessage() {}
 TileCompleteMessage::TileCompleteMessage(const uint64_t tile_x, const uint64_t tile_y,
 		const int64_t num_other_tiles)
 	: tile_x(tile_x), tile_y(tile_y), tile_id(tile_x + IMAGE_W / TILE_W * tile_y),
@@ -549,39 +469,38 @@ TileCompleteMessage* TileCompleteMessage::unpack(void *buf) {
 	return msg;
 }
 
-IntersectRayMessage::IntersectRayMessage()
-	: ray(pt::Ray(glm::vec3(NAN), glm::vec3(NAN)), 0, 0, 0, glm::vec3(NAN))
-{}
 IntersectRayMessage::IntersectRayMessage(const pt::ActiveRay &ray) : ray(ray) {}
 void IntersectRayMessage::msg_pup(PUP::er &p) {
 	p | ray;
 }
 
-ShadeRayMessage::ShadeRayMessage()
-	: ray(pt::Ray(glm::vec3(NAN), glm::vec3(NAN)), 0, 0, 0, glm::vec3(NAN))
-{}
 ShadeRayMessage::ShadeRayMessage(const pt::ActiveRay &ray) : ray(ray) {}
 void ShadeRayMessage::msg_pup(PUP::er &p) {
 	p | ray;
 }
 
-uint64_t RayResultMessage::DEBUG_COUNTER = 0;
-RayResultMessage::RayResultMessage() : debug_id(DEBUG_COUNTER++) {}
-RayResultMessage::RayResultMessage(const glm::vec4 &result, uint64_t tile, uint64_t pixel,
+RayResult::RayResult(const glm::vec4 &result, uint64_t tile, uint64_t pixel,
 		pt::RAY_TYPE type, uint64_t shadow_children, uint64_t secondary_children)
 	: result(result), tile(tile), pixel(pixel), type(type), shadow_children(shadow_children),
-	secondary_children(secondary_children), debug_id(DEBUG_COUNTER++)
+	secondary_children(secondary_children)
+{}
+void operator|(PUP::er &p, RayResult &r) {
+	p | r.result;
+	p | r.tile;
+	p | r.pixel;
+	int ray_type = r.type;
+	p | ray_type;
+	r.type = static_cast<pt::RAY_TYPE>(ray_type);
+	p | r.shadow_children;
+	p | r.secondary_children;
+}
+
+RayResultMessage::RayResultMessage(const glm::vec4 &rgbaz, uint64_t tile, uint64_t pixel,
+		pt::RAY_TYPE type, uint64_t shadow_children, uint64_t secondary_children)
+	: result(rgbaz, tile, pixel, type, shadow_children, secondary_children)
 {}
 void RayResultMessage::msg_pup(PUP::er &p) {
 	p | result;
-	p | tile;
-	p | pixel;
-	int ray_type = type;
-	p | ray_type;
-	type = static_cast<pt::RAY_TYPE>(ray_type);
-	p | shadow_children;
-	p | secondary_children;
-	p | debug_id;
 }
 
 #include "data_parallel.def.h"

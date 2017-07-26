@@ -11,6 +11,7 @@ class BoundsMessage;
 class IntersectRayMessage;
 class ShadeRayMessage;
 class RayResultMessage;
+struct RayResult;
 class TileCompleteMessage;
 
 /* A tile we own which is being actively rendered. We could
@@ -123,10 +124,21 @@ private:
 	void report_hit(pt::ActiveRay &ray);
 	// Report this ray has not hit anything, according to its ray type
 	void report_miss(pt::ActiveRay &ray);
+	// Report the result of rendering a ray spawned from one of this regions primary rays
+	void report_ray(const RayResult &result);
 	// Check if this region has data which projects to the tile
 	bool touches_tile(const uint64_t start_x, const uint64_t start_y, const pt::BBox &box) const;
 	// Project the passed bounding box to the screen
 	pt::BBox project_bounds(const pt::BBox &b) const;
+
+	/* TODO: Charm++ doesn't seem to like it when we send messages
+	 * to ourself? This is a pretty annoying thing to have to do, but designing
+	 * a nice generic dispatcher is also challenging. Maybe by writing this the crappy
+	 * way I'll get some idea how I'd like to abstract it
+	 */
+	void dispatch(const uint64_t to, IntersectRayMessage *msg);
+	void dispatch(const uint64_t to, ShadeRayMessage *msg);
+	void dispatch(const uint64_t to, RayResultMessage *msg);
 };
 
 class BoundsMessage : public CMessage_BoundsMessage {
@@ -139,8 +151,7 @@ public:
 };
 
 class TileCompleteMessage : public CMessage_TileCompleteMessage {
-	// Empty ctor only needed when unpacking a tile message
-	TileCompleteMessage();
+	TileCompleteMessage() = default;
 
 public:
 	// The tile index along x, y, in tile coords
@@ -167,8 +178,6 @@ public:
  * with its local data, and continue it if needed
  */
 class IntersectRayMessage : public CMessage_IntersectRayMessage {
-	IntersectRayMessage();
-
 public:
 	// TODO: Packets or larger chunks of rays, compression.
 	// Should convert renderer to a stream system and send sorted
@@ -183,8 +192,6 @@ public:
  * this ray. The message will be sent to the hit_info.hit_owner Chare
  */
 class ShadeRayMessage : public CMessage_ShadeRayMessage {
-	ShadeRayMessage();
-
 public:
 	pt::ActiveRay ray;
 
@@ -192,11 +199,9 @@ public:
 	void msg_pup(PUP::er &p);
 };
 
-class RayResultMessage : public CMessage_RayResultMessage {
-	RayResultMessage();
-	static uint64_t DEBUG_COUNTER;
-
-public:
+// TODO: This should basically just be sending back the ray, once I clean
+// reporting of the spawned rays
+struct RayResult {
 	// RGBAZ of the rendering result. If Z = INF then there was no hit
 	// TODO: Again, packets or larger, compression, etc.
 	glm::vec4 result;
@@ -205,9 +210,18 @@ public:
 	// If this ray is a primary ray or "path", this is the # of shadow
 	// rays spawned along this path we should expect to get results from
 	uint64_t shadow_children, secondary_children;
-	uint64_t debug_id;
 
-	RayResultMessage(const glm::vec4 &result, uint64_t tile, uint64_t pixel,
+	RayResult() = default;
+	RayResult(const glm::vec4 &result, uint64_t tile, uint64_t pixel,
+		pt::RAY_TYPE type, uint64_t shadow_children, uint64_t secondary_children);
+};
+void operator|(PUP::er &p, RayResult &r);
+
+class RayResultMessage : public CMessage_RayResultMessage {
+public:
+	RayResult result;
+
+	RayResultMessage(const glm::vec4 &rgbaz, uint64_t tile, uint64_t pixel,
 			pt::RAY_TYPE type, uint64_t shadow_children, uint64_t secondary_children);
 	void msg_pup(PUP::er &p);
 };
