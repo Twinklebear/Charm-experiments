@@ -83,7 +83,7 @@ bool RenderingTile::complete() const {
 
 Region::Region() : rng(std::random_device()()), bounds_received(0) {
 	if (thisIndex == 0) {
-		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(1));
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.9));
 		my_object = std::make_shared<pt::Plane>(glm::vec3(0), glm::vec3(0, 1, 0), 5, mat);
 	} else if (thisIndex == 1) {
 		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.9, 0.3, 0.9));
@@ -92,7 +92,7 @@ Region::Region() : rng(std::random_device()()), bounds_received(0) {
 		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
 		my_object = std::make_shared<pt::Sphere>(glm::vec3(2, 1.5, 0.7), 0.5, mat);
 	} else if (thisIndex == 3) {
-		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(1));
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.9));
 		my_object = std::make_shared<pt::Plane>(glm::vec3(0, 0, -3), glm::vec3(0, 0, 1), 5, mat);
 	} else if (thisIndex == 4) {
 		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.25, 0.75, 0.25));
@@ -101,7 +101,7 @@ Region::Region() : rng(std::random_device()()), bounds_received(0) {
 		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.75, 0.25, 0.25));
 		my_object = std::make_shared<pt::Plane>(glm::vec3(-3, 0, 0), glm::vec3(1, 0, 0), 5, mat);
 	} else if (thisIndex == 6) {
-		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(1));
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.9));
 		my_object = std::make_shared<pt::Plane>(glm::vec3(0, 4, 0), glm::vec3(0, -1, 0), 4.5, mat);
 	} else if (thisIndex == 7) {
 		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.3, 0.9, 0.9));
@@ -153,36 +153,39 @@ void Region::send_bounds(BoundsMessage *msg) {
 
 		// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
 		// or at least keep the scene alive, since the Region may have multiple geometry
-		integrator = std::unique_ptr<pt::WhittedIntegrator>(new pt::WhittedIntegrator(glm::vec3(0.05),
+		integrator = std::unique_ptr<pt::PathIntegrator>(new pt::PathIntegrator(glm::vec3(0.05),
 			pt::Scene({my_object},
 			{
-				std::make_shared<pt::PointLight>(glm::vec3(-0.5, 2, 1), glm::vec3(8)),
+				std::make_shared<pt::PointLight>(glm::vec3(-0.5, 2, 1), glm::vec3(0.8)),
 			},
 			&bvh
 		)));
 		main_proxy.region_loaded();
+
+		// TODO: We should save these bounds
+		const pt::BBox screen_bounds = project_bounds(my_object->bounds());
+		{
+			std::stringstream tmp;
+			tmp << screen_bounds << ", region bounds = " << my_object->bounds();
+			CkPrintf("Region %d screen bounds %s\n", thisIndex, tmp.str().c_str());
+		}
+		// Project bounds for all other regions so we can find out
+		// how many other box project to tiles in the image
+		other_screen_bounds.reserve(other_bounds.size());
+		for (const auto &b : other_bounds) {
+			other_screen_bounds.push_back(project_bounds(b));
+		}
 	}
 }
 void Region::render() {
+	rendering_tiles.clear();
+
 	// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
 	// or at least keep the scene alive, since the Region may have multiple geometry
 	const pt::Camera camera(scene->cam_pos, scene->cam_target, scene->cam_up, 65.0, IMAGE_W, IMAGE_H);
 
-	// Project the bounds of this regions data to the screen so we can determine which tiles
-	// the region touches, and thus needs to render
+	// TODO: We should save these bounds
 	const pt::BBox screen_bounds = project_bounds(my_object->bounds());
-	{
-		std::stringstream tmp;
-		tmp << screen_bounds << ", region bounds = " << my_object->bounds();
-		CkPrintf("Region %d screen bounds %s\n", thisIndex, tmp.str().c_str());
-	}
-
-	// Project bounds for all other regions so we can find out
-	// how many other box project to this tile
-	other_screen_bounds.reserve(other_bounds.size());
-	for (const auto &b : other_bounds) {
-		other_screen_bounds.push_back(project_bounds(b));
-	}
 
 	const uint64_t tiles_x = IMAGE_W / TILE_W;
 	const uint64_t tiles_y = IMAGE_H / TILE_H;
