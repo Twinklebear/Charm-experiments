@@ -73,7 +73,8 @@ IntersectionResult PathIntegrator::integrate(ActiveRay &ray) {
 		const glm::vec3 f = dg.brdf->eval(w_i, w_o);
 		if (glm::dot(light_sample.dir, dg.normal) > 0.0 && f != glm::vec3(0.f)) {
 			result.shadow = std::unique_ptr<ActiveRay>(ActiveRay::shadow(light_sample.occlusion_ray, ray));
-			result.shadow->color = ray.throughput * f * std::abs(glm::dot(light_sample.dir, dg.normal));
+			result.shadow->color = ray.throughput * f * light_sample.illum *
+				std::abs(glm::dot(light_sample.dir, dg.normal));
 		}
 	}
 
