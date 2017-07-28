@@ -15,14 +15,14 @@ ActiveRay::ActiveRay(const Ray &r, const uint64_t owner_id, const uint64_t tile,
 	tile(tile), pixel(pixel), children(0)
 {}
 ActiveRay* ActiveRay::shadow(const Ray &r, const ActiveRay &parent) {
-	ActiveRay *ar = new ActiveRay(r, parent.owner_id, parent.tile, parent.pixel,
-			parent.throughput);
+	ActiveRay *ar = new ActiveRay(r, parent.owner_id, parent.tile,
+			parent.pixel, glm::vec3(0));
 	ar->type = SHADOW;
 	return ar;
 }
 ActiveRay* ActiveRay::secondary(const Ray &r, const ActiveRay &parent) {
-	ActiveRay *ar = new ActiveRay(r, parent.owner_id, parent.tile, parent.pixel,
-			parent.throughput);
+	ActiveRay *ar = new ActiveRay(r, parent.owner_id, parent.tile,
+			parent.pixel, parent.throughput);
 	ar->type = SECONDARY;
 	return ar;
 }

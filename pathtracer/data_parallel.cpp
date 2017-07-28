@@ -82,11 +82,12 @@ bool RenderingTile::complete() const {
 }
 
 Region::Region() : rng(std::random_device()()), bounds_received(0) {
+#if 0
 	if (thisIndex == 0) {
 		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.9));
 		my_object = std::make_shared<pt::Plane>(glm::vec3(0), glm::vec3(0, 1, 0), 5, mat);
 	} else if (thisIndex == 1) {
-		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.9, 0.3, 0.9));
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.9, 0.3, 0.9));
 		my_object = std::make_shared<pt::Sphere>(glm::vec3(0.5, 0.5, 0), 1, mat);
 	} else if (thisIndex == 2) {
 		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
@@ -104,7 +105,7 @@ Region::Region() : rng(std::random_device()()), bounds_received(0) {
 		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.9));
 		my_object = std::make_shared<pt::Plane>(glm::vec3(0, 4, 0), glm::vec3(0, -1, 0), 4.5, mat);
 	} else if (thisIndex == 7) {
-		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::SpecularReflection>(glm::vec3(0.3, 0.9, 0.9));
+		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.3, 0.9, 0.9));
 		my_object = std::make_shared<pt::Sphere>(glm::vec3(-1.5, 1, -0.2), 0.7, mat);
 	} else if (thisIndex == 8) {
 		std::shared_ptr<pt::BxDF> mat = std::make_shared<pt::Lambertian>(glm::vec3(0.75, 0.25, 0.45));
@@ -112,6 +113,26 @@ Region::Region() : rng(std::random_device()()), bounds_received(0) {
 	} else {
 		throw std::runtime_error("too many test regions!");
 	}
+#else
+	std::shared_ptr<pt::BxDF> lambertian_blue = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
+	std::shared_ptr<pt::BxDF> lambertian_white = std::make_shared<pt::Lambertian>(glm::vec3(0.8));
+	std::shared_ptr<pt::BxDF> lambertian_red = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
+	std::shared_ptr<pt::BxDF> reflective = std::make_shared<pt::SpecularReflection>(glm::vec3(0.8));
+	std::vector<std::shared_ptr<pt::Geometry>> objs = {
+		std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, lambertian_blue),
+		std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.7, 1.0), 0.25, lambertian_blue),
+		std::make_shared<pt::Sphere>(glm::vec3(-1, -0.75, 1.2), 0.5, lambertian_red),
+		std::make_shared<pt::Plane>(glm::vec3(0, -1, 0), glm::vec3(0, 1, 0), 4, lambertian_white),
+		std::make_shared<pt::Plane>(glm::vec3(0, 2, 0), glm::vec3(0, -1, 0), 4, lambertian_white),
+		std::make_shared<pt::Plane>(glm::vec3(-1.5, 0, 0), glm::vec3(1, 0, 0), 4, lambertian_white),
+		std::make_shared<pt::Plane>(glm::vec3(1.5, 0, 0), glm::vec3(-1, 0, 0), 4, lambertian_white),
+		std::make_shared<pt::Plane>(glm::vec3(0, 0, -2), glm::vec3(0, 0, 1), 4, lambertian_white)
+	};
+	if (thisIndex >= objs.size()) {
+		throw std::runtime_error("Too many test regions!");
+	}
+	my_object = objs[thisIndex];
+#endif
 
 	other_bounds.resize(NUM_REGIONS);
 	world.resize(NUM_REGIONS);
@@ -156,7 +177,8 @@ void Region::send_bounds(BoundsMessage *msg) {
 		integrator = std::unique_ptr<pt::PathIntegrator>(new pt::PathIntegrator(glm::vec3(0.05),
 			pt::Scene({my_object},
 			{
-				std::make_shared<pt::PointLight>(glm::vec3(-0.5, 2, 1), glm::vec3(2)),
+			//	std::make_shared<pt::PointLight>(glm::vec3(-0.5, 2, 1), glm::vec3(2)),
+				std::make_shared<pt::PointLight>(glm::vec3(0, 1.5, 0.5), glm::vec3(0.9)),
 			},
 			&bvh
 		)));
@@ -344,15 +366,11 @@ void Region::report_hit(pt::ActiveRay &ray) {
 	}
 }
 void Region::report_miss(pt::ActiveRay &ray) {
-	if (ray.type == pt::RAY_TYPE::PRIMARY) {
-		dispatch(ray.owner_id, new RayResultMessage(
-					glm::vec4(integrator->background, ray.ray.t_max),
-					ray.tile, ray.pixel, ray.type, 0, 0));
-	} else if (ray.type == pt::RAY_TYPE::SECONDARY) {
+	if (ray.type != pt::RAY_TYPE::SHADOW) {
 		dispatch(ray.owner_id, new RayResultMessage(
 					glm::vec4(integrator->background * ray.throughput, ray.ray.t_max),
 					ray.tile, ray.pixel, ray.type, 0, 0));
-	} else if (ray.type == pt::RAY_TYPE::SHADOW) {
+	} else {
 		dispatch(ray.owner_id, new RayResultMessage(
 					glm::vec4(ray.color, ray.ray.t_max),
 					ray.tile, ray.pixel, ray.type, 0, 0));

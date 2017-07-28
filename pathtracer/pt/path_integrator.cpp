@@ -12,6 +12,8 @@ PathIntegrator::PathIntegrator(const glm::vec3 &background, Scene s)
 	background(background), scene(std::move(s))
 {}
 glm::vec3 PathIntegrator::integrate(Ray &start) {
+	// TODO: For simple testing maybe switch this to still be usable image-parallel?
+	// It can just combine calls to intersect and integrate to shade the initial camera ray
 	DifferentialGeometry dg;
 	glm::vec3 illum(0), path_throughput(1);
 	Ray ray = start;
