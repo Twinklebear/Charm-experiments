@@ -47,8 +47,7 @@ glm::vec3 PathIntegrator::integrate(Ray &start) {
 
 			ray = Ray(dg.point, dg.from_shading(f.w_i), 0.001);
 			ray.depth = i;
-			auto tmp = path_throughput * f.color * std::abs(glm::dot(ray.dir, dg.normal)) / f.pdf;
-			path_throughput = tmp;
+			path_throughput *= f.color * std::abs(glm::dot(ray.dir, dg.normal)) / f.pdf;
 		} else {
 			illum += path_throughput * background;
 			break;
