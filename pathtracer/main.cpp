@@ -47,7 +47,9 @@ float linear_to_srgb(const float x) {
 
 DistributedTile::DistributedTile() : tile_x(0), tile_y(0), num_tiles(-1) {}
 
-Main::Main(CkArgMsg *msg) : done_count(0), spp(1), samples_taken(0) {
+Main::Main(CkArgMsg *msg) : done_count(0), spp(1), samples_taken(0),
+	output_img("pathtracer_render.png")
+{
 	// Set some default image dimensions
 	TILE_W = 32;
 	TILE_H = 32;
@@ -56,6 +58,7 @@ Main::Main(CkArgMsg *msg) : done_count(0), spp(1), samples_taken(0) {
 	uint64_t tiles_x = 10;
 	uint64_t tiles_y = 10;
 	main_proxy = thisProxy;
+	bool image_parallel = false;
 
 	glm::vec3 cam_pos(0), cam_target(0), cam_up(0, 1, 0);
 	if (msg->argc > 1) {
@@ -85,6 +88,10 @@ Main::Main(CkArgMsg *msg) : done_count(0), spp(1), samples_taken(0) {
 				spp = std::atoi(msg->argv[++i]);
 			} else if (std::strcmp("--nr", msg->argv[i]) == 0) {
 				NUM_REGIONS = std::atoi(msg->argv[++i]);
+			} else if (std::strcmp("--img-parallel", msg->argv[i]) == 0) {
+				image_parallel = true;
+			} else if (std::strcmp("-o", msg->argv[i]) == 0) {
+				output_img = msg->argv[++i];
 			}
 		}
 	}
@@ -98,7 +105,7 @@ Main::Main(CkArgMsg *msg) : done_count(0), spp(1), samples_taken(0) {
 	scene = new SceneMessage(cam_pos, cam_target, cam_up);
 	CkPrintf("Rendering %dx%d image with %dx%d tile size\n", IMAGE_W, IMAGE_H, TILE_W, TILE_H);
 
-	if (false) {
+	if (image_parallel) {
 		CkPrintf("Rendering image-parallel\n");
 		img_tiles = CProxy_ImageParallelTile::ckNew(tiles_x, tiles_y);
 		start_pass = start_render = std::chrono::high_resolution_clock::now();
@@ -135,7 +142,7 @@ void Main::tile_done(const uint64_t x, const uint64_t y, const float *tile) {
 		if (samples_taken == spp) {
 			duration = duration_cast<milliseconds>(end - start_render);
 			CkPrintf("Rendering took %dms\n", duration.count());
-			save_image("pathtracer_render.png");
+			save_image(output_img);
 			CkExit();
 		} else {
 			start_pass = high_resolution_clock::now();
@@ -219,7 +226,7 @@ void Main::composite_image() {
 	if (samples_taken == spp) {
 		duration = duration_cast<milliseconds>(end - start_render);
 		CkPrintf("Rendering took %dms\n", duration.count());
-		save_image("pathtracer_render.png");
+		save_image(output_img);
 		CkExit();
 	} else {
 		start_pass = high_resolution_clock::now();

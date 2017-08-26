@@ -23,6 +23,7 @@ class Main : public CBase_Main {
 	uint64_t done_count;
 	uint64_t spp;
 	uint64_t samples_taken;
+	std::string output_img;
 	// Timing stuff
 	std::chrono::high_resolution_clock::time_point start_pass, start_render;
 	std::vector<float> image;
