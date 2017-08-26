@@ -38,11 +38,10 @@ bool Scene::intersect(Ray &ray, DifferentialGeometry &dg) const {
 			if (g->bounds().fast_intersect(ray, inv_dir, neg_dir)) {
 				if (g->intersect(ray)) {
 					g->get_shading_info(ray, dg);
+					return true;
 				}
-				return true;
-			} else {
-				return hit;
 			}
+			return hit;
 		});
 }
 
