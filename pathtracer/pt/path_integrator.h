@@ -23,7 +23,7 @@ public:
 
 	PathIntegrator(const glm::vec3 &background, Scene scene);
 	glm::vec3 integrate(Ray &ray);
-	IntersectionResult integrate(ActiveRay &ray);
+	IntersectionResult integrate(const ActiveRay &ray);
 	bool occluded(ActiveRay &ray);
 };
 
