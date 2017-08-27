@@ -10,7 +10,7 @@ Scene::Scene(std::vector<std::shared_ptr<Geometry>> geom, std::vector<std::share
 {}
 bool Scene::intersect(ActiveRay &ray) const {
 	const glm::vec3 inv_dir = 1.f / ray.ray.dir;
-	const std::array<int, 3> neg_dir{
+	const std::array<int, 3> neg_dir = {
 		ray.ray.dir.x < 0 ? 1 : 0,
 		ray.ray.dir.y < 0 ? 1 : 0,
 		ray.ray.dir.z < 0 ? 1 : 0
@@ -30,8 +30,10 @@ bool Scene::intersect(ActiveRay &ray) const {
 }
 bool Scene::intersect(Ray &ray, DifferentialGeometry &dg) const {
 	const glm::vec3 inv_dir = 1.f / ray.dir;
-	const std::array<int, 3> neg_dir{ray.dir.x < 0 ? 1 : 0,
-		ray.dir.y < 0 ? 1 : 0, ray.dir.z < 0 ? 1 : 0
+	const std::array<int, 3> neg_dir = {
+		ray.dir.x < 0 ? 1 : 0,
+		ray.dir.y < 0 ? 1 : 0,
+		ray.dir.z < 0 ? 1 : 0
 	};
 	return std::accumulate(geometry.begin(), geometry.end(), false,
 		[&](const bool &hit, const std::shared_ptr<Geometry> &g) {
