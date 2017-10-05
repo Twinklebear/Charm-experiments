@@ -81,7 +81,7 @@ bool RenderingTile::complete() const {
 	return primary_done && shadow_done && secondary_done;
 }
 
-Region::Region() : rng(std::random_device()()), bounds_received(0) {
+Region::Region() : sample_pass(0), rng(std::random_device()()), bounds_received(0) {
 	std::shared_ptr<pt::BxDF> lambertian_blue = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
 	std::shared_ptr<pt::BxDF> lambertian_white = std::make_shared<pt::Lambertian>(glm::vec3(0.8));
 	std::shared_ptr<pt::BxDF> lambertian_red = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
@@ -222,6 +222,7 @@ void Region::render() {
 			}
 		}
 	}
+	++sample_pass;
 }
 void Region::intersect_ray(IntersectRayMessage *msg) {
 	intersect_ray(msg->ray);
@@ -246,7 +247,7 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 	// each tile when testing who is first. TODO: in future send
 	// a set of random seeds to rotate through or something to have
 	// it not be totally deterministic.
-	std::mt19937 ray_dir_rng(start_x + start_y * IMAGE_W);
+	std::mt19937 ray_dir_rng(start_x + start_y * IMAGE_W + sample_pass);
 	std::uniform_real_distribution<float> real_distrib;
 	for (uint64_t i = 0; i < TILE_H; ++i) {
 		for (uint64_t j = 0; j < TILE_W; ++j) {

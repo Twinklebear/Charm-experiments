@@ -77,6 +77,7 @@ class Region : public CBase_Region {
 	std::unordered_map<size_t, RenderingTile> rendering_tiles;
 	uint64_t bounds_received;
 
+	uint64_t sample_pass;
 	std::mt19937 rng;
 
 public:
