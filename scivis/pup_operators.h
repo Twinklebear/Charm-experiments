@@ -15,9 +15,16 @@ inline void operator|(PUP::er &p, sv::VolumeDType &dtype) {
 	}
 }
 template<typename T>
-inline void operator|(PUP::er &p, glm::detail::tvec3<T, (glm::precision)0> &v) {
+inline void operator|(PUP::er &p, glm::tvec3<T, (glm::precision)0> &v) {
 	p | v.x;
 	p | v.y;
 	p | v.z;
+}
+template<typename T>
+inline void operator|(PUP::er &p, glm::tvec4<T, (glm::precision)0> &v) {
+	p | v.x;
+	p | v.y;
+	p | v.z;
+	p | v.w;
 }
 
