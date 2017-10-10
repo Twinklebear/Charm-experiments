@@ -123,7 +123,7 @@ Region::Region() : sample_pass(0), rng(std::random_device()()), bounds_received(
 		std::make_shared<pt::Sphere>(glm::vec3(-1.5, 1, -0.2), 0.7, mats[5]),
 		std::make_shared<pt::Sphere>(glm::vec3(-1, 0, 1), 0.5, mats[6])
 	};
-	std::shared_ptr<pt::Light> light = std::make_shared<pt::PointLight>(glm::vec3(-0.5, 2, 1), glm::vec3(0.9));
+	std::shared_ptr<pt::Light> light = std::make_shared<pt::PointLight>(glm::vec3(-0.5, 2, 1), glm::vec3(2));
 #endif
 	if (thisIndex >= objs.size()) {
 		throw std::runtime_error("Too many test regions!");
