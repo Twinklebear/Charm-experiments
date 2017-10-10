@@ -82,10 +82,12 @@ bool RenderingTile::complete() const {
 }
 
 Region::Region() : sample_pass(0), rng(std::random_device()()), bounds_received(0) {
+#if 0
 	std::shared_ptr<pt::BxDF> lambertian_blue = std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8));
 	std::shared_ptr<pt::BxDF> lambertian_white = std::make_shared<pt::Lambertian>(glm::vec3(0.8));
 	std::shared_ptr<pt::BxDF> lambertian_red = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
 	std::shared_ptr<pt::BxDF> reflective = std::make_shared<pt::SpecularReflection>(glm::vec3(0.8));
+
 	std::vector<std::shared_ptr<pt::Geometry>> objs = {
 		std::make_shared<pt::Plane>(glm::vec3(0, -1, 0), glm::vec3(0, 1, 0), 4, lambertian_white),
 		std::make_shared<pt::Plane>(glm::vec3(0, 2, 0), glm::vec3(0, -1, 0), 4, lambertian_white),
@@ -96,6 +98,33 @@ Region::Region() : sample_pass(0), rng(std::random_device()()), bounds_received(
 		std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.7, 1.0), 0.25, lambertian_blue),
 		std::make_shared<pt::Sphere>(glm::vec3(-1, -0.75, 1.2), 0.5, lambertian_red)
 	};
+	std::shared_ptr<pt::Light> light = std::make_shared<pt::PointLight>(glm::vec3(0, 1.5, 0.5), glm::vec3(0.9));
+#else
+	std::vector<std::shared_ptr<pt::BxDF>> mats = {
+		std::make_shared<pt::Lambertian>(glm::vec3(0.9)),
+		std::make_shared<pt::SpecularReflection>(glm::vec3(0.9, 0.3, 0.9)),
+		//std::make_shared<pt::Lambertian>(glm::vec3(0.9));
+		std::make_shared<pt::Lambertian>(glm::vec3(0.1, 0.1, 0.8)),
+		std::make_shared<pt::Lambertian>(glm::vec3(0.25, 0.75, 0.25)),
+		std::make_shared<pt::Lambertian>(glm::vec3(0.75, 0.25, 0.25)),
+		//std::make_shared<pt::Lambertian>(glm::vec3(0.9));
+		std::make_shared<pt::SpecularReflection>(glm::vec3(0.3, 0.9, 0.9)),
+		std::make_shared<pt::Lambertian>(glm::vec3(0.75, 0.25, 0.45))
+	};
+
+	std::vector<std::shared_ptr<pt::Geometry>> objs = {
+		std::make_shared<pt::Plane>(glm::vec3(0), glm::vec3(0, 1, 0), 5, mats[0]),
+		std::make_shared<pt::Sphere>(glm::vec3(0.5, 0.5, 0), 1, mats[1]),
+		std::make_shared<pt::Sphere>(glm::vec3(2, 1.5, 0.7), 0.5, mats[2]),
+		std::make_shared<pt::Plane>(glm::vec3(0, 0, -3), glm::vec3(0, 0, 1), 5, mats[0]),
+		std::make_shared<pt::Plane>(glm::vec3(3, 0, 0), glm::vec3(-1, 0, 0), 5, mats[3]),
+		std::make_shared<pt::Plane>(glm::vec3(-3, 0, 0), glm::vec3(1, 0, 0), 5, mats[4]),
+		std::make_shared<pt::Plane>(glm::vec3(0, 4, 0), glm::vec3(0, -1, 0), 4.5, mats[0]),
+		std::make_shared<pt::Sphere>(glm::vec3(-1.5, 1, -0.2), 0.7, mats[5]),
+		std::make_shared<pt::Sphere>(glm::vec3(-1, 0, 1), 0.5, mats[6])
+	};
+	std::shared_ptr<pt::Light> light = std::make_shared<pt::PointLight>(glm::vec3(-0.5, 2, 1), glm::vec3(0.9));
+#endif
 	if (thisIndex >= objs.size()) {
 		throw std::runtime_error("Too many test regions!");
 	}
@@ -104,9 +133,7 @@ Region::Region() : sample_pass(0), rng(std::random_device()()), bounds_received(
 		std::vector<std::shared_ptr<pt::Geometry>>{
 			objs[thisIndex],
 		},
-		std::vector<std::shared_ptr<pt::Light>>{
-			std::make_shared<pt::PointLight>(glm::vec3(0, 1.5, 0.5), glm::vec3(0.9))
-		}
+		std::vector<std::shared_ptr<pt::Light>>{light}
 	);
 
 	other_bounds.resize(NUM_REGIONS);
