@@ -87,14 +87,14 @@ Region::Region() : sample_pass(0), rng(std::random_device()()), bounds_received(
 	std::shared_ptr<pt::BxDF> lambertian_red = std::make_shared<pt::Lambertian>(glm::vec3(0.8, 0.1, 0.1));
 	std::shared_ptr<pt::BxDF> reflective = std::make_shared<pt::SpecularReflection>(glm::vec3(0.8));
 	std::vector<std::shared_ptr<pt::Geometry>> objs = {
-		std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, lambertian_blue),
-		std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.7, 1.0), 0.25, lambertian_blue),
-		std::make_shared<pt::Sphere>(glm::vec3(-1, -0.75, 1.2), 0.5, lambertian_red),
 		std::make_shared<pt::Plane>(glm::vec3(0, -1, 0), glm::vec3(0, 1, 0), 4, lambertian_white),
 		std::make_shared<pt::Plane>(glm::vec3(0, 2, 0), glm::vec3(0, -1, 0), 4, lambertian_white),
 		std::make_shared<pt::Plane>(glm::vec3(-1.5, 0, 0), glm::vec3(1, 0, 0), 4, lambertian_white),
 		std::make_shared<pt::Plane>(glm::vec3(1.5, 0, 0), glm::vec3(-1, 0, 0), 4, lambertian_white),
-		std::make_shared<pt::Plane>(glm::vec3(0, 0, -2), glm::vec3(0, 0, 1), 4, lambertian_white)
+		std::make_shared<pt::Plane>(glm::vec3(0, 0, -2), glm::vec3(0, 0, 1), 4, lambertian_white),
+		std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, lambertian_blue),
+		std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.7, 1.0), 0.25, lambertian_blue),
+		std::make_shared<pt::Sphere>(glm::vec3(-1, -0.75, 1.2), 0.5, lambertian_red)
 	};
 	if (thisIndex >= objs.size()) {
 		throw std::runtime_error("Too many test regions!");
