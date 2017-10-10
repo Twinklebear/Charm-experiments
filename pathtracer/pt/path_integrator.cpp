@@ -7,7 +7,7 @@
 
 namespace pt {
 
-#define DIRECT_ONLY 1
+#define DIRECT_ONLY 0
 
 PathIntegrator::PathIntegrator(const glm::vec3 &background, std::shared_ptr<Scene> s)
 	: rng(std::random_device()()), light_sample(0, s->lights.size() - 1),
@@ -106,7 +106,7 @@ IntersectionResult PathIntegrator::integrate(const ActiveRay &ray) {
 
 	// Spawn the secondary ray to continue the path if we're not at our depth limit
 #if !DIRECT_ONLY
-	if (ray.ray.depth < 1) {
+	if (ray.ray.depth < 10) {
 #else
 	if (false) {
 #endif
@@ -118,7 +118,7 @@ IntersectionResult PathIntegrator::integrate(const ActiveRay &ray) {
 
 			result.secondary = std::unique_ptr<ActiveRay>(ActiveRay::secondary(secondary_ray, ray));
 			result.secondary->throughput = ray.throughput * f.color
-				* std::abs(glm::dot(ray.ray.dir, dg.normal)) / f.pdf;
+				* std::abs(glm::dot(secondary_ray.dir, dg.normal)) / f.pdf;
 
 			// Trying to hunt down why I end up with > 1 throughputs here, resulting in energy being added
 			if (glm::any(glm::greaterThan(result.secondary->throughput, glm::vec3(1.f)))) {
@@ -130,6 +130,7 @@ IntersectionResult PathIntegrator::integrate(const ActiveRay &ray) {
 					<< "pdf = " << f.pdf << "\n"
 					<< "parent ray depth = " << ray.ray.depth << "\n";
 #endif
+				throw std::runtime_error("Greater than 1!\n");
 				//result.secondary->throughput = glm::clamp(f.color, glm::vec3(0), glm::vec3(1));
 			}
 		}
