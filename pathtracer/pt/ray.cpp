@@ -17,6 +17,7 @@ std::ostream& operator<<(std::ostream &os, const pt::Ray &r) {
 		<< "\n\tdir: " << glm::to_string(r.dir)
 		<< "\n\tt_min: " << r.t_min
 		<< "\n\tt_max: " << r.t_max
+		<< "\n\tdepth: " << r.depth
 		<< "\n}";
 	return os;
 }
