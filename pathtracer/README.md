@@ -8,5 +8,5 @@ lives on a different "node" and ray tracing is done by sending rays through the 
 the different node's local geometry. Currently this is pretty trivial since the geometry is simple, but
 my current work is extending it up to support large meshes distributed over a cluster for rendering.
 
-![Prototype image](http://i.imgur.com/E96hgO8.png)
+![Prototype image](https://i.imgur.com/1LhhptY.png)
 
