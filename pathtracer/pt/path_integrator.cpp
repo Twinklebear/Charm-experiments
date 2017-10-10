@@ -22,13 +22,14 @@ glm::vec3 PathIntegrator::integrate(Ray &start) {
 		// TODO: This dg intersect needs to be removed
 		if (scene.intersect(ray, dg)) {
 			dg.orthonormalize();
-			const glm::vec3 w_o = dg.to_shading(-ray.dir);
+			const glm::vec3 w_o = glm::normalize(dg.to_shading(-ray.dir));
 
 			// Do direct light sampling
-			if (!(dg.brdf->bxdf_type() & BRDFType::Specular)) {
+			if (i > 0 && !(dg.brdf->bxdf_type() & BRDFType::Specular)) {
 				const Light *l = scene.lights[light_sample(rng)].get();
 				const LightSample light_sample = l->incident(dg.point);
 				const glm::vec3 w_i = dg.to_shading(light_sample.dir);
+
 				if (glm::dot(light_sample.dir, dg.normal) > 0.0 && !light_sample.occluded(scene)) {
 					// note: no division by pdf since it's 1 for the delta light
 					// TODO: We should divide by the probability of picking the light we chose though
@@ -45,7 +46,7 @@ glm::vec3 PathIntegrator::integrate(Ray &start) {
 				break;
 			}
 
-			ray = Ray(dg.point, dg.from_shading(f.w_i), 0.001);
+			ray = Ray(dg.point, glm::normalize(dg.from_shading(f.w_i)), 0.001);
 			ray.depth = i;
 			path_throughput *= f.color * std::abs(glm::dot(ray.dir, dg.normal)) / f.pdf;
 #if 0
@@ -71,10 +72,10 @@ IntersectionResult PathIntegrator::integrate(const ActiveRay &ray) {
 	DifferentialGeometry dg;
 	scene.geometry[ray.hit_info.hit_object]->get_shading_info(ray.ray, dg);
 	dg.orthonormalize();
+	const glm::vec3 w_o = glm::normalize(dg.to_shading(-ray.ray.dir));
 
-	const glm::vec3 w_o = dg.to_shading(-ray.ray.dir);
 	// Do direct light sampling
-	if (!(dg.brdf->bxdf_type() & BRDFType::Specular)) {
+	if (!ray.type == PRIMARY && !(dg.brdf->bxdf_type() & BRDFType::Specular)) {
 		const Light *l = scene.lights[light_sample(rng)].get();
 		const LightSample light_sample = l->incident(dg.point);
 		const glm::vec3 w_i = dg.to_shading(light_sample.dir);
@@ -94,9 +95,8 @@ IntersectionResult PathIntegrator::integrate(const ActiveRay &ray) {
 		const float samples[2] = { brdf_sample(rng), brdf_sample(rng) };
 		const BxDFSample f = dg.brdf->sample(w_o, samples);
 		if (f.pdf != 0.f && f.color != glm::vec3(0.f)) {
-			Ray secondary_ray = Ray(dg.point, dg.from_shading(f.w_i), 0.001);
+			Ray secondary_ray = Ray(dg.point, glm::normalize(dg.from_shading(f.w_i)), 0.001);
 			secondary_ray.depth = ray.ray.depth + 1;
-
 
 			result.secondary = std::unique_ptr<ActiveRay>(ActiveRay::secondary(secondary_ray, ray));
 			result.secondary->throughput = ray.throughput * f.color
@@ -109,9 +109,10 @@ IntersectionResult PathIntegrator::integrate(const ActiveRay &ray) {
 					<< "parent ray throughput = " << glm::to_string(ray.throughput) << "\n"
 					<< "f.color = " << glm::to_string(f.color) << "\n"
 					<< "geom term = " << std::abs(glm::dot(ray.ray.dir, dg.normal)) << "\n"
-					<< "pdf = " << f.pdf << "\n";
+					<< "pdf = " << f.pdf << "\n"
+					<< "parent ray depth = " << ray.ray.depth << "\n";
 #endif
-				result.secondary->throughput = glm::vec3(0.8) * f.color;
+				//result.secondary->throughput = glm::clamp(f.color, glm::vec3(0), glm::vec3(1));
 			}
 		}
 	}
