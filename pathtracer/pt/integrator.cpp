@@ -41,16 +41,17 @@ std::ostream& operator<<(std::ostream &os, const pt::RAY_TYPE &t) {
 }
 std::ostream& operator<<(std::ostream &os, const pt::ActiveRay &r) {
 	os << "ActiveRay {\ntype: " << r.type
-		<< "\nray: " << r.ray
-		<< "\ntraversal: " << r.traversal
-		<< "\nhit: " << r.hit_info.hit
-		<< "\nhit owner: " << r.hit_info.hit_owner
-		<< "\nhit object: " << r.hit_info.hit_object
-		<< "\ncolor: " << glm::to_string(r.color)
-		<< "\nowner_id: " << r.owner_id
-		<< "\ntile: " << r.tile
-		<< "\npixel: " << r.pixel
-		<< "\nchildren: " << r.children
+		<< "\n\tray: " << r.ray
+		<< "\n\ttraversal: " << r.traversal
+		<< "\n\thit: " << r.hit_info.hit
+		<< "\n\thit owner: " << r.hit_info.hit_owner
+		<< "\n\thit object: " << r.hit_info.hit_object
+		<< "\n\tcolor: " << glm::to_string(r.color)
+		<< "\n\tthroughput: " << glm::to_string(r.throughput)
+		<< "\n\towner_id: " << r.owner_id
+		<< "\n\ttile: " << r.tile
+		<< "\n\tpixel: " << r.pixel
+		<< "\n\tchildren: " << r.children
 		<< "\n}";
 	return os;
 }

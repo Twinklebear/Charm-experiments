@@ -58,14 +58,11 @@ void ImageParallelTile::render() {
 				std::make_shared<pt::Plane>(glm::vec3(0, 2, 0), glm::vec3(0, -1, 0), 4, lambertian_white),
 				std::make_shared<pt::Plane>(glm::vec3(-1.5, 0, 0), glm::vec3(1, 0, 0), 4, lambertian_white),
 				std::make_shared<pt::Plane>(glm::vec3(1.5, 0, 0), glm::vec3(-1, 0, 0), 4, lambertian_white),
-				std::make_shared<pt::Plane>(glm::vec3(0, 0, -2), glm::vec3(0, 0, 1), 4, lambertian_white)
-#if 0
-				,
+				std::make_shared<pt::Plane>(glm::vec3(0, 0, -2), glm::vec3(0, 0, 1), 4, lambertian_white),
 				// Spheres
 				std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, lambertian_blue),
 				std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.7, 1.0), 0.25, lambertian_blue),
 				std::make_shared<pt::Sphere>(glm::vec3(-1, -0.75, 1.2), 0.5, lambertian_red),
-#endif
 			},
 			std::vector<std::shared_ptr<pt::Light>>
 			{
@@ -78,8 +75,7 @@ void ImageParallelTile::render() {
 		for (uint64_t j = 0; j < TILE_W; ++j) {
 			const float px = j + start_x;
 			const float py = i + start_y;
-			//pt::Ray ray = camera.generate_ray(px, py, {real_distrib(rng), real_distrib(rng)});
-			pt::Ray ray = camera.generate_ray(px, py, {0.5, 0.5});
+			pt::Ray ray = camera.generate_ray(px, py, {real_distrib(rng), real_distrib(rng)});
 			const glm::vec3 color = integrator.integrate(ray);
 			for (size_t c = 0; c < 3; ++c) {
 				tile[(i * TILE_W + j) * 3 + c] = color[c];

@@ -92,12 +92,9 @@ Region::Region() : sample_pass(0), rng(std::random_device()()), bounds_received(
 		std::make_shared<pt::Plane>(glm::vec3(-1.5, 0, 0), glm::vec3(1, 0, 0), 4, lambertian_white),
 		std::make_shared<pt::Plane>(glm::vec3(1.5, 0, 0), glm::vec3(-1, 0, 0), 4, lambertian_white),
 		std::make_shared<pt::Plane>(glm::vec3(0, 0, -2), glm::vec3(0, 0, 1), 4, lambertian_white),
-#if 0
-		,
 		std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, lambertian_blue),
 		std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.7, 1.0), 0.25, lambertian_blue),
 		std::make_shared<pt::Sphere>(glm::vec3(-1, -0.75, 1.2), 0.5, lambertian_red)
-#endif
 	};
 	if (thisIndex >= objs.size()) {
 		throw std::runtime_error("Too many test regions!");
@@ -105,8 +102,7 @@ Region::Region() : sample_pass(0), rng(std::random_device()()), bounds_received(
 
 	local_scene = std::make_shared<pt::Scene>(
 		std::vector<std::shared_ptr<pt::Geometry>>{
-			//objs[thisIndex],
-			objs
+			objs[thisIndex],
 		},
 		std::vector<std::shared_ptr<pt::Light>>{
 			std::make_shared<pt::PointLight>(glm::vec3(0, 1.5, 0.5), glm::vec3(0.9))
@@ -264,8 +260,7 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 			const float py = i + start_y;
 			const uint64_t pixel = i * TILE_W + j;
 			const pt::Ray cam_ray = camera.generate_ray(px, py,
-					//{real_distrib(ray_dir_rng), real_distrib(ray_dir_rng)});
-					{0.5, 0.5});
+					{real_distrib(ray_dir_rng), real_distrib(ray_dir_rng)});
 			pt::ActiveRay ray(cam_ray, thisIndex, tile.msg->tile_id, pixel, glm::vec3(1));
 			start_ray(ray);
 		}
