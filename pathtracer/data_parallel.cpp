@@ -92,7 +92,6 @@ Region::Region() : sample_pass(0), rng(std::random_device()()), bounds_received(
 		std::make_shared<pt::Plane>(glm::vec3(-1.5, 0, 0), glm::vec3(1, 0, 0), 4, lambertian_white),
 		std::make_shared<pt::Plane>(glm::vec3(1.5, 0, 0), glm::vec3(-1, 0, 0), 4, lambertian_white),
 		std::make_shared<pt::Plane>(glm::vec3(0, 0, -2), glm::vec3(0, 0, 1), 4, lambertian_white),
-		std::make_shared<pt::Plane>(glm::vec3(0, 0, -5), glm::vec3(0, 0, 1), 4, lambertian_white)
 #if 0
 		,
 		std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, lambertian_blue),
