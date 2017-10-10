@@ -4,6 +4,7 @@
 
 namespace pt {
 
+Scene::Scene() : bvh(nullptr) {}
 Scene::Scene(std::vector<std::shared_ptr<Geometry>> geom, std::vector<std::shared_ptr<Light>> lights,
 		const BVH *bvh)
 	: geometry(geom), lights(lights), bvh(bvh)
@@ -45,6 +46,14 @@ bool Scene::intersect(Ray &ray, DifferentialGeometry &dg) const {
 			}
 			return hit;
 		});
+}
+BBox Scene::bounds() const {
+	// The BVH is not local geometry, so does not count as our "bounds"
+	BBox b;
+	for (const auto &g : geometry) {
+		b.box_union(g->bounds());
+	}
+	return b;
 }
 
 }

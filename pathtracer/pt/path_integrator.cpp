@@ -7,9 +7,11 @@
 
 namespace pt {
 
-PathIntegrator::PathIntegrator(const glm::vec3 &background, Scene s)
-	: rng(std::random_device()()), light_sample(0, s.lights.size() - 1),
-	background(background), scene(std::move(s))
+#define DIRECT_ONLY 1
+
+PathIntegrator::PathIntegrator(const glm::vec3 &background, std::shared_ptr<Scene> s)
+	: rng(std::random_device()()), light_sample(0, s->lights.size() - 1),
+	background(background), scene(s)
 {}
 glm::vec3 PathIntegrator::integrate(Ray &start) {
 	// TODO: For simple testing maybe switch this to still be usable image-parallel?
@@ -18,19 +20,27 @@ glm::vec3 PathIntegrator::integrate(Ray &start) {
 	glm::vec3 illum(0), path_throughput(1);
 	Ray ray = start;
 	float samples[2] = {0};
+#if !DIRECT_ONLY
 	for (size_t i = 0; i < 2; ++i) {
+#else
+	for (size_t i = 0; i < 1; ++i) {
+#endif
 		// TODO: This dg intersect needs to be removed
-		if (scene.intersect(ray, dg)) {
+		if (scene->intersect(ray, dg)) {
 			dg.orthonormalize();
 			const glm::vec3 w_o = glm::normalize(dg.to_shading(-ray.dir));
 
 			// Do direct light sampling
+#if !DIRECT_ONLY
 			if (i > 0 && !(dg.brdf->bxdf_type() & BRDFType::Specular)) {
-				const Light *l = scene.lights[light_sample(rng)].get();
+#else
+			if (!(dg.brdf->bxdf_type() & BRDFType::Specular)) {
+#endif
+				const Light *l = scene->lights[light_sample(rng)].get();
 				const LightSample light_sample = l->incident(dg.point);
 				const glm::vec3 w_i = dg.to_shading(light_sample.dir);
 
-				if (glm::dot(light_sample.dir, dg.normal) > 0.0 && !light_sample.occluded(scene)) {
+				if (glm::dot(light_sample.dir, dg.normal) > 0.0 && !light_sample.occluded(*scene)) {
 					// note: no division by pdf since it's 1 for the delta light
 					// TODO: We should divide by the probability of picking the light we chose though
 					illum += path_throughput * dg.brdf->eval(w_i, w_o) * light_sample.illum
@@ -70,13 +80,17 @@ IntersectionResult PathIntegrator::integrate(const ActiveRay &ray) {
 	IntersectionResult result;
 
 	DifferentialGeometry dg;
-	scene.geometry[ray.hit_info.hit_object]->get_shading_info(ray.ray, dg);
+	scene->geometry[ray.hit_info.hit_object]->get_shading_info(ray.ray, dg);
 	dg.orthonormalize();
 	const glm::vec3 w_o = glm::normalize(dg.to_shading(-ray.ray.dir));
 
 	// Do direct light sampling
+#if !DIRECT_ONLY
 	if (!ray.type == PRIMARY && !(dg.brdf->bxdf_type() & BRDFType::Specular)) {
-		const Light *l = scene.lights[light_sample(rng)].get();
+#else
+	if (!(dg.brdf->bxdf_type() & BRDFType::Specular)) {
+#endif
+		const Light *l = scene->lights[light_sample(rng)].get();
 		const LightSample light_sample = l->incident(dg.point);
 		const glm::vec3 w_i = dg.to_shading(light_sample.dir);
 
@@ -91,7 +105,11 @@ IntersectionResult PathIntegrator::integrate(const ActiveRay &ray) {
 	}
 
 	// Spawn the secondary ray to continue the path if we're not at our depth limit
+#if !DIRECT_ONLY
 	if (ray.ray.depth < 1) {
+#else
+	if (false) {
+#endif
 		const float samples[2] = { brdf_sample(rng), brdf_sample(rng) };
 		const BxDFSample f = dg.brdf->sample(w_o, samples);
 		if (f.pdf != 0.f && f.color != glm::vec3(0.f)) {
@@ -119,7 +137,7 @@ IntersectionResult PathIntegrator::integrate(const ActiveRay &ray) {
 	return result;
 }
 bool PathIntegrator::occluded(ActiveRay &ray) {
-	return scene.intersect(ray);
+	return scene->intersect(ray);
 }
 
 }

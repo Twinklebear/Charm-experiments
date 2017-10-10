@@ -92,14 +92,27 @@ Region::Region() : sample_pass(0), rng(std::random_device()()), bounds_received(
 		std::make_shared<pt::Plane>(glm::vec3(-1.5, 0, 0), glm::vec3(1, 0, 0), 4, lambertian_white),
 		std::make_shared<pt::Plane>(glm::vec3(1.5, 0, 0), glm::vec3(-1, 0, 0), 4, lambertian_white),
 		std::make_shared<pt::Plane>(glm::vec3(0, 0, -2), glm::vec3(0, 0, 1), 4, lambertian_white),
+		std::make_shared<pt::Plane>(glm::vec3(0, 0, -5), glm::vec3(0, 0, 1), 4, lambertian_white)
+#if 0
+		,
 		std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, lambertian_blue),
 		std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.7, 1.0), 0.25, lambertian_blue),
 		std::make_shared<pt::Sphere>(glm::vec3(-1, -0.75, 1.2), 0.5, lambertian_red)
+#endif
 	};
 	if (thisIndex >= objs.size()) {
 		throw std::runtime_error("Too many test regions!");
 	}
-	my_object = objs[thisIndex];
+
+	local_scene = std::make_shared<pt::Scene>(
+		std::vector<std::shared_ptr<pt::Geometry>>{
+			//objs[thisIndex],
+			objs
+		},
+		std::vector<std::shared_ptr<pt::Light>>{
+			std::make_shared<pt::PointLight>(glm::vec3(0, 1.5, 0.5), glm::vec3(0.9))
+		}
+	);
 
 	other_bounds.resize(NUM_REGIONS);
 	world.resize(NUM_REGIONS);
@@ -110,7 +123,7 @@ Region::Region(CkMigrateMessage *msg) : rng(std::random_device()()), bounds_rece
 }
 void Region::load() {
 	if (NUM_REGIONS == 1) {
-		main_proxy.region_loaded();
+		setup_distributed_world();
 	} else {
 		// Test of computing our bounds and sharing them with others
 		// Build up the list of other regions in the world and send them our bounds
@@ -122,7 +135,7 @@ void Region::load() {
 		}
 
 		others = CProxySection_Region::ckNew(thisArrayID, elems.getVec(), elems.size());
-		BoundsMessage *msg = new BoundsMessage(thisIndex, my_object->bounds());
+		BoundsMessage *msg = new BoundsMessage(thisIndex, local_scene->bounds());
 		others.send_bounds(msg);
 	}
 }
@@ -133,36 +146,33 @@ void Region::send_bounds(BoundsMessage *msg) {
 	delete msg;
 	++bounds_received;
 	if (bounds_received == NUM_REGIONS - 1) {
-		world[thisIndex] = pt::DistributedRegion(my_object->bounds(), thisIndex, true);
-		std::vector<const pt::DistributedRegion*> world_ptrs;
-		std::transform(world.begin(), world.end(), std::back_inserter(world_ptrs),
-				[](const pt::DistributedRegion &a) { return &a; });
-		bvh = pt::BVH(world_ptrs);
+		setup_distributed_world();
+	}
+}
+void Region::setup_distributed_world() {
+	world[thisIndex] = pt::DistributedRegion(local_scene->bounds(), thisIndex, true);
+	std::vector<const pt::DistributedRegion*> world_ptrs;
+	std::transform(world.begin(), world.end(), std::back_inserter(world_ptrs),
+			[](const pt::DistributedRegion &a) { return &a; });
+	bvh = pt::BVH(world_ptrs);
 
-		// TODO: Don't hardcode integrator, camera, read them from scene and keep them around?
-		// or at least keep the scene alive, since the Region may have multiple geometry
-		integrator = std::unique_ptr<pt::PathIntegrator>(new pt::PathIntegrator(glm::vec3(0.05),
-			pt::Scene({my_object},
-			{
-				std::make_shared<pt::PointLight>(glm::vec3(0, 1.5, 0.5), glm::vec3(0.9)),
-			},
-			&bvh
-		)));
-		main_proxy.region_loaded();
+	local_scene->bvh = &bvh;
+	integrator = std::unique_ptr<pt::PathIntegrator>(new pt::PathIntegrator(glm::vec3(0.05), local_scene));
+	main_proxy.region_loaded();
 
-		// TODO: We should save these bounds
-		const pt::BBox screen_bounds = project_bounds(my_object->bounds());
-		{
-			std::stringstream tmp;
-			tmp << screen_bounds << ", region bounds = " << my_object->bounds();
-			CkPrintf("Region %d screen bounds %s\n", thisIndex, tmp.str().c_str());
-		}
-		// Project bounds for all other regions so we can find out
-		// how many other box project to tiles in the image
-		other_screen_bounds.reserve(other_bounds.size());
-		for (const auto &b : other_bounds) {
-			other_screen_bounds.push_back(project_bounds(b));
-		}
+	// TODO: We should save these bounds
+	const pt::BBox screen_bounds = project_bounds(local_scene->bounds());
+	{
+		std::stringstream tmp;
+		tmp << screen_bounds << ", region bounds = " << local_scene->bounds()
+			<< ", # geom = " << local_scene->geometry.size();
+		CkPrintf("Region %d screen bounds %s\n", thisIndex, tmp.str().c_str());
+	}
+	// Project bounds for all other regions so we can find out
+	// how many other box project to tiles in the image
+	other_screen_bounds.reserve(other_bounds.size());
+	for (const auto &b : other_bounds) {
+		other_screen_bounds.push_back(project_bounds(b));
 	}
 }
 void Region::render() {
@@ -173,7 +183,7 @@ void Region::render() {
 	const pt::Camera camera(scene->cam_pos, scene->cam_target, scene->cam_up, 65.0, IMAGE_W, IMAGE_H);
 
 	// TODO: We should save these bounds
-	const pt::BBox screen_bounds = project_bounds(my_object->bounds());
+	const pt::BBox screen_bounds = project_bounds(local_scene->bounds());
 
 	const uint64_t tiles_x = IMAGE_W / TILE_W;
 	const uint64_t tiles_y = IMAGE_H / TILE_H;
@@ -255,7 +265,8 @@ void Region::render_tile(RenderingTile &tile, const uint64_t start_x, const uint
 			const float py = i + start_y;
 			const uint64_t pixel = i * TILE_W + j;
 			const pt::Ray cam_ray = camera.generate_ray(px, py,
-					{real_distrib(ray_dir_rng), real_distrib(ray_dir_rng)});
+					//{real_distrib(ray_dir_rng), real_distrib(ray_dir_rng)});
+					{0.5, 0.5});
 			pt::ActiveRay ray(cam_ray, thisIndex, tile.msg->tile_id, pixel, glm::vec3(1));
 			start_ray(ray);
 		}
@@ -280,7 +291,7 @@ void Region::start_ray(pt::ActiveRay &ray) {
 	}
 }
 void Region::intersect_ray(pt::ActiveRay &ray) {
-	const bool hit = integrator->scene.intersect(ray);
+	const bool hit = local_scene->intersect(ray);
 	if (hit) {
 		ray.hit_info.hit_owner = thisIndex;
 	}

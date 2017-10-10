@@ -49,21 +49,28 @@ void ImageParallelTile::render() {
 
 	// TODO: Each tile should be also have Z for compositing primary rays.
 	float *tile = new float[TILE_W * TILE_H * 3];
-	pt::PathIntegrator integrator(glm::vec3(0.05), pt::Scene({
-			// Walls
-			std::make_shared<pt::Plane>(glm::vec3(0, -1, 0), glm::vec3(0, 1, 0), 4, lambertian_white),
-			std::make_shared<pt::Plane>(glm::vec3(0, 2, 0), glm::vec3(0, -1, 0), 4, lambertian_white),
-			std::make_shared<pt::Plane>(glm::vec3(-1.5, 0, 0), glm::vec3(1, 0, 0), 4, lambertian_white),
-			std::make_shared<pt::Plane>(glm::vec3(1.5, 0, 0), glm::vec3(-1, 0, 0), 4, lambertian_white),
-			std::make_shared<pt::Plane>(glm::vec3(0, 0, -2), glm::vec3(0, 0, 1), 4, lambertian_white)
-			// Spheres
-			//std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, lambertian_blue),
-			//std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.7, 1.0), 0.25, lambertian_blue),
-			//std::make_shared<pt::Sphere>(glm::vec3(-1, -0.75, 1.2), 0.5, lambertian_red),
-		},
-		{
-			std::make_shared<pt::PointLight>(glm::vec3(0, 1.5, 0.5), glm::vec3(0.9)),
-		}
+	pt::PathIntegrator integrator(glm::vec3(0.05),
+		std::make_shared<pt::Scene>(
+			std::vector<std::shared_ptr<pt::Geometry>>
+			{
+				// Walls
+				std::make_shared<pt::Plane>(glm::vec3(0, -1, 0), glm::vec3(0, 1, 0), 4, lambertian_white),
+				std::make_shared<pt::Plane>(glm::vec3(0, 2, 0), glm::vec3(0, -1, 0), 4, lambertian_white),
+				std::make_shared<pt::Plane>(glm::vec3(-1.5, 0, 0), glm::vec3(1, 0, 0), 4, lambertian_white),
+				std::make_shared<pt::Plane>(glm::vec3(1.5, 0, 0), glm::vec3(-1, 0, 0), 4, lambertian_white),
+				std::make_shared<pt::Plane>(glm::vec3(0, 0, -2), glm::vec3(0, 0, 1), 4, lambertian_white)
+#if 0
+				,
+				// Spheres
+				std::make_shared<pt::Sphere>(glm::vec3(0), 1.0, lambertian_blue),
+				std::make_shared<pt::Sphere>(glm::vec3(1.0, 0.7, 1.0), 0.25, lambertian_blue),
+				std::make_shared<pt::Sphere>(glm::vec3(-1, -0.75, 1.2), 0.5, lambertian_red),
+#endif
+			},
+			std::vector<std::shared_ptr<pt::Light>>
+			{
+				std::make_shared<pt::PointLight>(glm::vec3(0, 1.5, 0.5), glm::vec3(0.9)),
+			}
 	));
 
 	std::uniform_real_distribution<float> real_distrib;
@@ -71,7 +78,8 @@ void ImageParallelTile::render() {
 		for (uint64_t j = 0; j < TILE_W; ++j) {
 			const float px = j + start_x;
 			const float py = i + start_y;
-			pt::Ray ray = camera.generate_ray(px, py, {real_distrib(rng), real_distrib(rng)});
+			//pt::Ray ray = camera.generate_ray(px, py, {real_distrib(rng), real_distrib(rng)});
+			pt::Ray ray = camera.generate_ray(px, py, {0.5, 0.5});
 			const glm::vec3 color = integrator.integrate(ray);
 			for (size_t c = 0; c < 3; ++c) {
 				tile[(i * TILE_W + j) * 3 + c] = color[c];

@@ -19,9 +19,9 @@ class PathIntegrator {
 
 public:
 	glm::vec3 background;
-	Scene scene;
+	std::shared_ptr<Scene> scene;
 
-	PathIntegrator(const glm::vec3 &background, Scene scene);
+	PathIntegrator(const glm::vec3 &background, std::shared_ptr<Scene> scene);
 	glm::vec3 integrate(Ray &ray);
 	IntersectionResult integrate(const ActiveRay &ray);
 	bool occluded(ActiveRay &ray);

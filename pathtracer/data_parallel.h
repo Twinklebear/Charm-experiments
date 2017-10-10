@@ -66,7 +66,7 @@ class Region : public CBase_Region {
 	CProxySection_Region others;
 	// TODO: We need to serialize or save/reload the object if
 	// the chare migrates
-	std::shared_ptr<pt::Geometry> my_object;
+	std::shared_ptr<pt::Scene> local_scene;
 	// TODO: We need to serialize this if the chare migrates
 	std::vector<pt::BBox> other_bounds, other_screen_bounds;
 	std::vector<pt::DistributedRegion> world;
@@ -89,6 +89,10 @@ public:
 	void load();
 	// Receive another region's bounds
 	void send_bounds(BoundsMessage *msg);
+	/* Setup the BVH and other info for the distributed world information,
+	 * after receiving bounds from everyone.
+	 */
+	void setup_distributed_world();
 	// Render the region tiles which this region projects to,
 	// compute and send primary rays for any pixels where this Region is the closest box
 	// TODO: Description of the ray sending and data stuff.
