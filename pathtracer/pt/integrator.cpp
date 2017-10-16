@@ -12,7 +12,7 @@ HitInfo::HitInfo() : hit(false), hit_owner(-1), hit_object(-1) {}
 ActiveRay::ActiveRay(const Ray &r, const uint64_t owner_id, const uint64_t tile,
 		const uint64_t pixel, const glm::vec3 &throughput)
 	: type(PRIMARY), ray(r), color(0), throughput(throughput), owner_id(owner_id),
-	tile(tile), pixel(pixel), children(0)
+	tile(tile), pixel(pixel), shadow_children(0)
 {}
 ActiveRay* ActiveRay::shadow(const Ray &r, const ActiveRay &parent) {
 	ActiveRay *ar = new ActiveRay(r, parent.owner_id, parent.tile,
@@ -23,6 +23,7 @@ ActiveRay* ActiveRay::shadow(const Ray &r, const ActiveRay &parent) {
 ActiveRay* ActiveRay::secondary(const Ray &r, const ActiveRay &parent) {
 	ActiveRay *ar = new ActiveRay(r, parent.owner_id, parent.tile,
 			parent.pixel, parent.throughput);
+	ar->shadow_children = parent.shadow_children;
 	ar->type = SECONDARY;
 	return ar;
 }
@@ -51,7 +52,7 @@ std::ostream& operator<<(std::ostream &os, const pt::ActiveRay &r) {
 		<< "\n\towner_id: " << r.owner_id
 		<< "\n\ttile: " << r.tile
 		<< "\n\tpixel: " << r.pixel
-		<< "\n\tchildren: " << r.children
+		<< "\n\tchildren: " << r.shadow_children
 		<< "\n}";
 	return os;
 }

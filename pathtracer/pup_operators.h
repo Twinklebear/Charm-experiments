@@ -49,6 +49,6 @@ inline void operator|(PUP::er &p, pt::ActiveRay &ray) {
 	p | ray.owner_id;
 	p | ray.tile;
 	p | ray.pixel;
-	p | ray.children;
+	p | ray.shadow_children;
 }
 

@@ -55,7 +55,7 @@ glm::vec3 PathIntegrator::integrate(Ray &start) {
 	}
 	return illum;
 }
-IntersectionResult PathIntegrator::integrate(const ActiveRay &ray) {
+IntersectionResult PathIntegrator::integrate(ActiveRay &ray) {
 	IntersectionResult result;
 
 	DifferentialGeometry dg;
@@ -73,6 +73,7 @@ IntersectionResult PathIntegrator::integrate(const ActiveRay &ray) {
 		// TODO: We should divide by the probability of picking the light we chose though
 		const glm::vec3 f = dg.brdf->eval(w_i, w_o);
 		if (glm::dot(light_sample.dir, dg.normal) > 0.0 && f != glm::vec3(0.f)) {
+			ray.shadow_children += 1;
 			result.shadow = std::unique_ptr<ActiveRay>(ActiveRay::shadow(light_sample.occlusion_ray, ray));
 			result.shadow->color = ray.throughput * f * light_sample.illum
 				* std::abs(glm::dot(light_sample.dir, dg.normal));

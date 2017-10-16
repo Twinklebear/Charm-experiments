@@ -60,6 +60,7 @@ void RenderingTile::report_secondary_ray(const uint64_t px, const uint64_t spawn
 			msg->tile[tx + c] += result[c];
 		}
 	}
+	complete();
 }
 void RenderingTile::report_shadow_ray(const uint64_t px, const glm::vec3 &result) {
 	shadow_rays_received[px] += 1;
@@ -70,6 +71,7 @@ void RenderingTile::report_shadow_ray(const uint64_t px, const glm::vec3 &result
 	for (size_t c = 0; c < 3; ++c) {
 		msg->tile[tx + c] += result[c];
 	}
+	complete();
 }
 bool RenderingTile::complete() const {
 	const bool primary_done = std::all_of(primary_rays_expected.begin(), primary_rays_expected.end(),
@@ -332,20 +334,22 @@ void Region::intersect_ray(pt::ActiveRay &ray) {
 }
 void Region::shade_ray(pt::ActiveRay &ray) {
 	pt::IntersectionResult result = integrator->integrate(ray);
-	// If there's no shadow or secondary ray we're shading a back face hit
-	if (!result.shadow && !result.secondary) {
-		dispatch(ray.owner_id, new RayResultMessage(
-					glm::vec4(0, 0, 0, ray.ray.t_max),
-					ray.tile, ray.pixel, ray.type, 0, 0));
-	} else {
-		// Report what we've spawned to the owner
-		const uint64_t shadow_child = result.shadow ? 1 : 0;
-		const uint64_t secondary_child = result.secondary ? 1 : 0;
 
+	if (!result.secondary) {
+		// If there's secondary this path is terminating, report back the
+		// number of shadow rays spawned along the path for shading.
 		dispatch(ray.owner_id, new RayResultMessage(
 					glm::vec4(0, 0, 0, ray.ray.t_max),
 					ray.tile, ray.pixel, ray.type,
-					shadow_child, secondary_child));
+					ray.shadow_children, 0));
+	} else if (ray.type == pt::RAY_TYPE::PRIMARY) {
+		// Primary rays will report how many secondary rays they've spawned
+		// at the first hit, so we know how many to expect.
+		const uint64_t secondary_child = result.secondary ? 1 : 0;
+		dispatch(ray.owner_id, new RayResultMessage(
+					glm::vec4(0, 0, 0, ray.ray.t_max),
+					ray.tile, ray.pixel, ray.type,
+					0, secondary_child));
 	}
 
 	if (result.secondary) {
@@ -372,7 +376,7 @@ void Region::report_miss(pt::ActiveRay &ray) {
 	} else {
 		dispatch(ray.owner_id, new RayResultMessage(
 					glm::vec4(integrator->background * ray.throughput, ray.ray.t_max),
-					ray.tile, ray.pixel, ray.type, 0, 0));
+					ray.tile, ray.pixel, ray.type, ray.shadow_children, 0));
 	}
 }
 void Region::report_ray(const RayResult &result) {
