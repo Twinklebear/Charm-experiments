@@ -14,7 +14,7 @@
 namespace pt {
 
 /* A BVH2 built off of the one introduced in PBR and modified to
- * use Afta and Szirmay-Kalos's stackless traversal algorithm from
+ * use Afra and Szirmay-Kalos's stackless traversal algorithm from
  * "Stackless Multi-BVH Traversal for CPU, MIC and GPU Ray Tracing"
  */
 class BVH {
